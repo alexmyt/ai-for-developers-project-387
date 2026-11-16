@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jdx/jactionlint/main/schema/jactionlint-config.json
+
+# Согласованные исключения из проверок jactionlint. После даты expires находка
+# возвращается — исключение нужно осознанно продлить или устранить причину.
+ignores:
+  - rule: dangerous-triggers
+    file: .github/workflows/opencode.yml
+    reason: >-
+      триггер issue_comment необходим для /oc-комментариев; риск смягчён
+      фильтром автора (author_association == OWNER), OIDC-обменом на App-токен
+      с минимальными правами и checkout только основной ветки
+    expires: '2026-12-31'

@@ -4,6 +4,10 @@ min_version = "2026.11.3"
 hk = { version = "2.11.1", workflow = "release.yml" }
 node = "22.23.4"
 pnpm = "12.18.0"
+# Статическая проверка GitHub Actions (задача check-workflows).
+jactionlint = "2.6.0"
+# run-скрипты в workflow jactionlint проверяет через shellcheck.
+shellcheck = "0.11.0"
 
 [env]
 # hk и git-хуки запускают eslint/prettier из локальных зависимостей проекта.
@@ -23,8 +27,13 @@ run = "pnpm build"
 
 [tasks.check]
 # Единственная команда всех проверок: формат, линтер, типы, тесты, сборка,
-# генерация контракта и SDK, проверка свежести и браузерный e2e (AGENTS.md).
-run = "pnpm check"
+# генерация контракта и SDK, проверка свежести и браузерный e2e (AGENTS.md),
+# плюс статическая проверка GitHub Actions workflow.
+run = ["pnpm check", "mise run check-workflows"]
+
+[tasks.check-workflows]
+# jactionlint по .github/workflows и .github/jactionlint.yaml. Доступна отдельно.
+run = "jactionlint"
 
 [tasks.generate]
 # Одна команда: TypeSpec → openapi.json → SDK (ADR-0002).
