@@ -1,0 +1,106 @@
+# Render MCP Server
+
+The public deployment of this app lives on [Render](https://render.com): one Docker web service (`call-calendar`) serving both the API and the SPA statics, declared in `render.yaml` at the repo root (see ADR-0004). The Render [MCP server](https://render.com/docs/mcp-server) (`https://mcp.render.com/mcp`) lets an agent create services, plan and approve deploys from the blueprint, read logs, and update environment variables.
+
+## Authentication model
+
+Render's authorization server accepts only **pre-registered OAuth clients** — the ones baked into Render's official plugins for Claude Code, Codex, and Cursor. It supports neither dynamic client registration (RFC 7591) nor client ID metadata documents, so any MCP client without an official plugin cannot start an OAuth flow: OpenCode reports `Incompatible auth server: does not support dynamic client registration`.
+
+Two working options:
+
+1. **Official plugin (OAuth, no keys to manage)** — Claude Code: `/plugin install render@claude-plugins-official`, Cursor: `/add-plugin render`, Codex: `codex mcp add render --url https://mcp.render.com/mcp --oauth-client-id codex`.
+2. **API key through an environment variable** — works with any MCP client, including OpenCode. The key lives in your shell environment, never in the repository.
+
+## Connecting
+
+### OpenCode (the agent of this project)
+
+`opencode.json` already wires the server through the [`mcp-remote`](https://github.com/geelen/mcp-remote) bridge — the same pattern Render documents for Claude Desktop:
+
+```jsonc
+{
+  "mcp": {
+    "servers": {
+      "render": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "mcp-remote",
+          "https://mcp.render.com/mcp",
+          "--header",
+          "Authorization: Bearer ${RENDER_API_KEY}"
+        ],
+        "environment": {
+          "RENDER_API_KEY": "{env:RENDER_API_KEY}"
+        }
+      }
+    }
+  }
+}
+```
+
+Why the bridge instead of a native remote entry (verified on OpenCode v2.2.5):
+
+- Render's OAuth server accepts only clients pre-registered in official plugins, so OpenCode cannot start an OAuth flow (see [Authentication model](#authentication-model)).
+- OpenCode resolves `{env:…}` in remote-server headers to an empty string, and spawns local MCP servers with a sanitized environment that strips credential-looking variables — a native remote entry sends `Authorization: Bearer ` with an empty key and every tool call fails with `unauthorized`.
+- The bridge moves both problems to well-defined ground: the `environment` field passes the key to the child process (`{env:…}` works there), and `mcp-remote` expands `${RENDER_API_KEY}` from its own environment into the header — its log confirms `Replacing ${RENDER_API_KEY} with environment value`.
+
+Setup:
+
+1. Create an API key: [Account Settings → API Keys](https://dashboard.render.com/u/settings?add-api-key).
+2. Export it in the shell that launches OpenCode (`export RENDER_API_KEY="rnd_…"`, or keep it in `~/.zshrc`).
+3. Start OpenCode from that shell, then verify:
+
+```sh
+opencode mcp list # should show ✓ render connected
+```
+
+### Claude Code
+
+Prefer the official plugin: `/plugin install render@claude-plugins-official` (OAuth). For a manual `.mcp.json` at the repo root (keep it untracked), pass the key via header — Claude Code expands `${VAR}` from the environment:
+
+```json
+{
+  "mcpServers": {
+    "render": {
+      "type": "http",
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${RENDER_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+`"type": "http"` is required: a `url` entry without a `type` is read as a stdio server and fails.
+
+### Cursor
+
+Prefer the official plugin: `/add-plugin render` (OAuth). For a manual `.cursor/mcp.json` (keep it untracked):
+
+```json
+{
+  "mcpServers": {
+    "render": {
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:RENDER_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+## Usage
+
+- The deployment is managed from `render.yaml` (blueprint). The MCP server's Blueprint tools are in public alpha: `create_blueprint` (point it at this repository, branch `main`, path `render.yaml`), then `plan_blueprint`, review the plan with the user, and only then `approve_blueprint`.
+- A service created by hand must match `render.yaml`: name `call-calendar`, Docker runtime, plan `free`, region `frankfurt`, health check `/api/health`. Note that `create_web_service` does not accept the `free` plan — prefer the blueprint path.
+- The public URL of the deployment is in the README.
+
+## Safety
+
+- **No API keys in the repository, ever.** Keys live in the shell environment; `{env:…}` and `${…}` references in committed config files are placeholders, not secrets. Never paste a key into chat, issues, or commits.
+- Blueprint tools apply infrastructure changes: plan first, review with the user, approve only after explicit authorization.
+- The MCP server can trigger deploys and rewrite a service's environment variables — review prompts that would change a running service before confirming them.

@@ -1,0 +1,35 @@
+{
+  "name": "call-calendar",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @repo/contract build && pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "generate": "pnpm --filter @repo/contract build && pnpm --filter @repo/sdk generate",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm generate && git diff --exit-code -- packages/contract/openapi.json packages/sdk/src && pnpm --filter @repo/e2e e2e",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "pnpm build && pnpm --filter @repo/e2e e2e",
+    "docker:build": "docker build -t call-calendar:latest .",
+    "e2e:container": "pnpm docker:build && pnpm --filter @repo/e2e e2e:container",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "eslint": "10.14.0",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "8.72.2",
+    "vitest": "5.1.0"
+  }
+}

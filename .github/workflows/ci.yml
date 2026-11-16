@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Инструменты из mise.toml (node, pnpm, hk): в CI та же команда,
+      # что и локально — mise run check (см. AGENTS.md).
+      - uses: jdx/mise-action@v5
+
+      - run: pnpm install --frozen-lockfile
+
+      # Браузер для Playwright: mise run check завершается браузерным e2e
+      # с настоящим сервером, сеть не мокается.
+      - run: pnpm --filter @repo/e2e exec playwright install --with-deps chromium
+
+      - run: mise run check
