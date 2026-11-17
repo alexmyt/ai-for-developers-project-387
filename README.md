@@ -129,6 +129,38 @@ pnpm build        # контракт → openapi.json, затем API и веб
 E2E_BASE_URL=https://call-calendar-zfmn.onrender.com pnpm e2e
 ```
 
+## Агент OpenCode
+
+В репозитории установлен GitHub App
+[OpenCode Agent](https://github.com/apps/opencode-agent) — стандартный агент
+opencode. Работа с issues и PR ведётся через него, отдельных самописных
+агентов нет.
+
+Воркфлоу агента —
+[.github/workflows/opencode.yml](.github/workflows/opencode.yml).
+
+- **Событие.** Новый комментарий в issue или PR (`issue_comment` и
+  `pull_request_review_comment`, только `types: [created]`).
+- **Команды.** Запуск — упоминание `/oc` или `/opencode` в комментарии,
+  например «/oc объясни этот issue». Прогоны по остальным комментариям
+  и по ответам самого бота пропускаются (status `skipped`); право автора
+  на запуск проверяет экшен `anomalyco/opencode/github`.
+- **Модель.** `opencode/deepseek-v4.1-flash`; ключ `OPENCODE_API_KEY`
+  хранится в Actions Secrets.
+- **Авторизация.** GitHub App + OIDC-обмен: у job права `contents: read`
+  и `id-token: write`, комментарии и push делает App-токен, checkout —
+  с `persist-credentials: false`. Прогон ограничен тайм-аутом 15 минут,
+  параллельные запуски по одному issue/PR выстраиваются в очередь
+  (`concurrency`).
+- **Результаты.** Агент отвечает комментарием в issue/PR со ссылкой на
+  прогон; при доработках создаёт ветку и PR. Все прогоны видны на вкладке
+  [Actions](https://github.com/alexmyt/ai-for-developers-project-387/actions).
+- **Share.** Сессии не публикуются: share в конфигурации не включён,
+  публичных ссылок на сессии агента нет.
+- **Контекст агента.** На раннере доступны скиллы из `.agents/skills/`
+  (реестр — `skills-lock.json`) и правила работы с issue-трекером из
+  [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
+
 ---
 
 <details>
