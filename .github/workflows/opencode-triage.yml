@@ -4,16 +4,22 @@ on:
   issues:
     types: [opened]
 
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   triage:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read
     steps:
       - name: Check account age
         id: check
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const user = await github.rest.users.getByUsername({
@@ -24,7 +30,7 @@ jobs:
             return days >= 30;
           result-encoding: string
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         if: steps.check.outputs.result == 'true' && !endsWith(github.actor, '[bot]')
         with:
           persist-credentials: false
@@ -35,7 +41,7 @@ jobs:
         # (anomalyco/opencode#17224, #23915) — bot-авторов issue пропускаем.
         if: steps.check.outputs.result == 'true' && !endsWith(github.actor, '[bot]')
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
           model: opencode/deepseek-v4.1-flash
           prompt: |
