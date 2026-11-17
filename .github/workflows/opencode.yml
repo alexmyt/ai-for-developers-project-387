@@ -6,40 +6,34 @@ on:
   pull_request_review_comment:
     types: [created]
 
-# Один запуск на задачу: следующие /oc-комментарии ждут своей очереди и не рвут
-# текущую работу агента (cancel-in-progress: false).
+permissions: {}
 concurrency:
-  group: opencode-${{ github.event.issue.number || github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   opencode:
-    # Триггер issue_comment может запустить любой комментирующий, а выполняется
-    # workflow в контексте основной ветки с секретом: пускаем только владельца
-    # репозитория и только по /oc (правило dangerous-triggers, исключение —
-    # в .github/jactionlint.yaml).
-    if: >-
-      github.event.comment.author_association == 'OWNER' &&
-      (contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode'))
+    if: |
+      contains(github.event.comment.body, ' /oc') ||
+      startsWith(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, ' /opencode') ||
+      startsWith(github.event.comment.body, '/opencode')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # OIDC-режим (https://opencode.ai/docs/github/): комментирование и push
-    # идут от App-токена, полученного обменом OIDC-токена, поэтому токену
-    # workflow нужны только эти права.
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read
+      pull-requests: read
+      issues: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 1
           persist-credentials: false
 
-      - name: Run OpenCode
+      - name: Run opencode
         uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a # latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }} # имя секрета зависит от провайдера в model
         with:
-          model: opencode/deepseek-v4.1-flash-free
+          model: opencode/deepseek-v4.1-flash
