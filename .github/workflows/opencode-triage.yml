@@ -25,12 +25,15 @@ jobs:
           result-encoding: string
 
       - uses: actions/checkout@v6
-        if: steps.check.outputs.result == 'true'
+        if: steps.check.outputs.result == 'true' && !endsWith(github.actor, '[bot]')
         with:
           persist-credentials: false
 
-      - uses: anomalyco/opencode/github@latest
-        if: steps.check.outputs.result == 'true'
+      - uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a
+        # assertPermissions() экшена проверяет context.actor через API collaborators,
+        # а для bot-аккаунтов GitHub всегда возвращает permission: none
+        # (anomalyco/opencode#17224, #23915) — bot-авторов issue пропускаем.
+        if: steps.check.outputs.result == 'true' && !endsWith(github.actor, '[bot]')
         env:
           ANTHROPIC_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
