@@ -123,6 +123,18 @@ url = "https://nodejs.org/dist/v22.23.4/node-v22.23.4-darwin-x64.tar.gz"
 checksum = "sha256:cbc74b5e0982c9dbb41525fd8fb5dcd32fbee237863f7829072f4639a1ce5f20"
 url = "https://nodejs.org/dist/v22.23.4/node-v22.23.4-win-x64.zip"
 
+[[tools.opencode]]
+version = "2.3.0"
+aube = { path = ".mise/locks/opencode/2.3.0~009061c2", digest = "sha256:7551d2030029342acda79c9d94e764e59e099221b482eb878f5f589eb576a26d" }
+backend = "npm:@opencode/cli"
+specifiers = ["2.3.0"]
+
+[tools.opencode.options]
+allow_builds = '["@opencode/cli"]'
+
+[tools.opencode.provenance]
+repository = "github.com/anomalyco/opencode"
+
 [[tools.pnpm]]
 version = "12.18.0"
 backend = "aqua:pnpm/pnpm"

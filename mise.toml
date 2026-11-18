@@ -2,6 +2,9 @@ min_version = "2026.11.3"
 
 [tools]
 hk = { version = "2.11.1", workflow = "release.yml" }
+# Ревью PR в .github/workflows/opencode-pr.yml: установка с чексуммой в mise.lock
+# вместо curl|bash (правило unverified-download jactionlint).
+opencode = "2.3.0"
 node = "22.23.4"
 pnpm = "12.18.0"
 # Статическая проверка GitHub Actions (задача check-workflows).
