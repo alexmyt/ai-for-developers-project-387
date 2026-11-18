@@ -13,6 +13,8 @@ exclude = List(
   "pnpm-lock.yaml",
   "packages/sdk/src/**",
   "packages/contract/openapi.json",
+  // Lock-данные mise: дайджест в mise.lock считается по этим файлам.
+  ".mise/**",
   "CHANGELOG.md",
 )
 

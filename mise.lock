@@ -125,7 +125,7 @@ url = "https://nodejs.org/dist/v22.23.4/node-v22.23.4-win-x64.zip"
 
 [[tools.opencode]]
 version = "2.3.0"
-aube = { path = ".mise/locks/opencode/2.3.0~009061c2", digest = "sha256:7551d2030029342acda79c9d94e764e59e099221b482eb878f5f589eb576a26d" }
+aube = { path = ".mise/locks/opencode/2.3.0~009061c2", digest = "sha256:eaf18cc675dfba856b40284b5c2f6280e8d27edebf0510d67478ed7b7770bd2c" }
 backend = "npm:@opencode/cli"
 specifiers = ["2.3.0"]
 

@@ -4,6 +4,9 @@ coverage
 pnpm-lock.yaml
 packages/contract/openapi.json
 packages/sdk/src
+# Lock-данные mise: дайджест в mise.lock считается по этим файлам,
+# переформатирование ломает проверку `mise install --locked` в CI.
+.mise
 .agents
 README.md
 AGENTS.md
