@@ -129,6 +129,19 @@ function deferredBooking(): {
   return { promise, resolve }
 }
 
+/** Обещание перечитывания доступности под контролем теста. */
+function deferredAvailability(): {
+  promise: Promise<{ data: Availability; error: undefined }>
+  resolve: (availability: Availability) => void
+} {
+  type AvailabilityResult = { data: Availability; error: undefined }
+  let resolve!: (availability: Availability) => void
+  const promise = new Promise<AvailabilityResult>((res) => {
+    resolve = (availability) => res({ data: availability, error: undefined })
+  })
+  return { promise, resolve }
+}
+
 async function selectFreeSlot(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   // Первый день выбран по умолчанию, в нём один свободный слот; ждём
   // загрузку календаря, прежде чем кликнуть. Имя кнопки — время и статус.
@@ -308,9 +321,18 @@ describe('Страница записи', () => {
     expect(screen.queryByRole('button', { name: 'Подтвердить запись' })).not.toBeInTheDocument()
   })
 
-  it('после успеха показывает «Бронь подтверждена. До встречи!» и слот становится занятым', async () => {
+  it('после успеха показывает «Бронь подтверждена. До встречи!» и берёт занятость с сервера', async () => {
     const user = userEvent.setup()
     vi.mocked(createBooking).mockResolvedValue({ data: bookingFixture, error: undefined })
+    // После брони сервер отдаёт слот занятым — статус приходит из второго
+    // ответа доступности, а не помечается локально (спецификация §11).
+    vi.mocked(getAvailability)
+      .mockReset()
+      .mockResolvedValueOnce({ data: availabilityFixture(), error: undefined })
+      .mockResolvedValueOnce({
+        data: availabilityWithFirstDay([{ ...freeSlot, status: 'taken' }, takenSlot]),
+        error: undefined,
+      })
     renderBookPage()
     await selectFreeSlot(user)
 
@@ -319,8 +341,10 @@ describe('Страница записи', () => {
     await user.click(screen.getByRole('button', { name: 'Подтвердить запись' }))
 
     expect(await screen.findByText('Бронь подтверждена. До встречи!')).toBeVisible()
-    // Локальное обновление: забронированный слот теперь занят (спецификация §11).
-    expect(screen.queryByText('Свободно')).not.toBeInTheDocument()
+    // Доступность перечитана: статусы второго ответа отображаются.
+    await waitFor(() => {
+      expect(vi.mocked(getAvailability)).toHaveBeenCalledTimes(2)
+    })
     const bookedRow = screen.getByText('10:00–10:30 МСК').closest('li')
     expect(bookedRow).not.toBeNull()
     expect(within(bookedRow as HTMLElement).getByText('Занято')).toBeVisible()
@@ -330,11 +354,33 @@ describe('Страница записи', () => {
     expect(screen.getByRole('button', { name: 'Продолжить' })).toBeDisabled()
   })
 
-  it('после брони пересекающиеся слоты становятся занятыми без перечитывания', async () => {
+  it('сбой перечитывания после успеха не скрывает подтверждение', async () => {
+    const user = userEvent.setup()
+    vi.mocked(createBooking).mockResolvedValue({ data: bookingFixture, error: undefined })
+    vi.mocked(getAvailability)
+      .mockReset()
+      .mockResolvedValueOnce({ data: availabilityFixture(), error: undefined })
+      .mockRejectedValueOnce(new Error('сеть недоступна'))
+    renderBookPage()
+    await selectFreeSlot(user)
+
+    await user.type(screen.getByLabelText('Имя'), 'Анна')
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com')
+    await user.click(screen.getByRole('button', { name: 'Подтвердить запись' }))
+
+    // Подтверждение не зависит от перечитывания, а сбой не ломает экран
+    // (спецификация §11, user story 7).
+    expect(await screen.findByText('Бронь подтверждена. До встречи!')).toBeVisible()
+    await waitFor(() => {
+      expect(vi.mocked(getAvailability)).toHaveBeenCalledTimes(2)
+    })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('после брони перечитывает календарь и показывает пересекающиеся слоты занятыми', async () => {
     const user = userEvent.setup()
     // Тип на 60 минут: сетка даёт пересекающиеся слоты 10:00–11:00 и
-    // 10:30–11:30 — после брони занят и соседний (§6: занятый слот
-    // не предлагается свободным).
+    // 10:30–11:30 — после брони сервер отдаёт занятым и соседний (§6).
     const hourSlot = {
       start: '2026-11-11T07:00:00Z',
       end: '2026-11-11T08:00:00Z',
@@ -353,8 +399,16 @@ describe('Страница записи', () => {
     } as const
     vi.mocked(getAvailability)
       .mockReset()
-      .mockResolvedValue({
+      .mockResolvedValueOnce({
         data: availabilityWithFirstDay([hourSlot, overlapSlot, touchingSlot]),
+        error: undefined,
+      })
+      .mockResolvedValueOnce({
+        data: availabilityWithFirstDay([
+          { ...hourSlot, status: 'taken' },
+          { ...overlapSlot, status: 'taken' },
+          touchingSlot,
+        ]),
         error: undefined,
       })
     vi.mocked(listMeetingTypes)
@@ -376,12 +430,13 @@ describe('Страница записи', () => {
     await user.click(screen.getByRole('button', { name: 'Подтвердить запись' }))
 
     await screen.findByText('Бронь подтверждена. До встречи!')
+    // Статусы взяты из второго ответа сервера, а не посчитаны локально.
+    await waitFor(() => {
+      expect(vi.mocked(getAvailability)).toHaveBeenCalledTimes(2)
+    })
     expect(screen.getByText('10:00–11:00 МСК').closest('li')).toHaveTextContent('Занято')
     expect(screen.getByText('10:30–11:30 МСК').closest('li')).toHaveTextContent('Занято')
     expect(screen.getByText('11:00–11:30 МСК').closest('li')).toHaveTextContent('Свободно')
-    // Обновление локальное: календарь не перечитывается и страница
-    // не перезагружается.
-    expect(vi.mocked(getAvailability)).toHaveBeenCalledTimes(1)
   })
 
   it('ошибка slot_taken показывает сообщение сервера', async () => {
@@ -432,17 +487,18 @@ describe('Страница записи', () => {
     expect(screen.getByLabelText('Email')).toHaveValue('anna@example.com')
   })
 
-  it('после конфликта перечитывает календарь и показывает конфликтный слот занятым', async () => {
+  it('после конфликта перечитывает календарь и не помечает слот локально', async () => {
     const user = userEvent.setup()
     // До конфликта свободны 09:00 и 10:00; после — оба заняли (соседний
     // занял другой гость), и это видно только после перечитывания.
-    mockAvailabilityAroundConflict(
-      availabilityWithFirstDay([freeSlot, morningSlot]),
-      availabilityWithFirstDay([
-        { ...freeSlot, status: 'taken' },
-        { ...morningSlot, status: 'taken' },
-      ]),
-    )
+    const refresh = deferredAvailability()
+    vi.mocked(getAvailability)
+      .mockReset()
+      .mockResolvedValueOnce({
+        data: availabilityWithFirstDay([freeSlot, morningSlot]),
+        error: undefined,
+      })
+      .mockReturnValueOnce(refresh.promise)
     vi.mocked(createBooking).mockResolvedValue(slotTakenError())
     renderBookPage()
     await selectFreeSlot(user)
@@ -451,12 +507,25 @@ describe('Страница записи', () => {
     await user.type(screen.getByLabelText('Email'), 'anna@example.com')
     await user.click(screen.getByRole('button', { name: 'Подтвердить запись' }))
 
-    // Доступность перечитана через SDK после ответа 409 (§11).
+    // Доступность перечитывается через SDK после ответа 409 (§11).
     await waitFor(() => {
       expect(vi.mocked(getAvailability)).toHaveBeenCalledTimes(2)
     })
-    const conflictRow = screen.getByText('10:00–10:30 МСК').closest('li')
-    expect(within(conflictRow as HTMLElement).getByText('Занято')).toBeVisible()
+    // Пока второй ответ не пришёл, статусы остаются из первого: локальной
+    // пометки конфликтного слота нет.
+    expect(screen.getByText('10:00–10:30 МСК').closest('li')).toHaveTextContent('Свободно')
+    expect(screen.getByText('Свободных слотов на этот день: 2')).toBeVisible()
+
+    refresh.resolve(
+      availabilityWithFirstDay([
+        { ...freeSlot, status: 'taken' },
+        { ...morningSlot, status: 'taken' },
+      ]),
+    )
+    await waitFor(() => {
+      const conflictRow = screen.getByText('10:00–10:30 МСК').closest('li')
+      expect(within(conflictRow as HTMLElement).getByText('Занято')).toBeVisible()
+    })
     const neighbourRow = screen.getByText('09:00–09:30 МСК').closest('li')
     expect(within(neighbourRow as HTMLElement).getByText('Занято')).toBeVisible()
     expect(screen.getByText('Свободных слотов на этот день: 0')).toBeVisible()

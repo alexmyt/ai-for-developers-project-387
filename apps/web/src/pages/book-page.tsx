@@ -85,36 +85,9 @@ export function BookPage() {
   }
 
   /**
-   * Забронированный интервал делает занятыми все пересекающие его слоты,
-   * а не только слот с точным совпадением старта: у типа на 60 минут занят
-   * и соседний старт через 30 минут (§6 — занятый слот не предлагается
-   * свободным). Интервалы полуоткрытые [start, end): касание границами
-   * не пересечение — та же логика, что на сервере (booking.domain.ts).
-   */
-  function markSlotTaken(startIso: string, endIso: string): void {
-    const bookedStart = new Date(startIso).getTime()
-    const bookedEnd = new Date(endIso).getTime()
-    setAvailability((prev) =>
-      prev
-        ? {
-            ...prev,
-            days: prev.days.map((day) => ({
-              ...day,
-              slots: day.slots.map((slot) => {
-                const intersects =
-                  bookedStart < new Date(slot.end).getTime() &&
-                  new Date(slot.start).getTime() < bookedEnd
-                return intersects ? { ...slot, status: 'taken' as const } : slot
-              }),
-            })),
-          }
-        : prev,
-    )
-  }
-
-  /**
-   * Перечитывает доступность через SDK: конфликтный слот и брони других
-   * гостей становятся занятыми (спецификация §11).
+   * Перечитывает доступность через SDK — единственный источник статусов
+   * слотов. Вызывается после успешной брони и после конфликта
+   * (спецификация §11).
    */
   async function refreshAvailability(): Promise<void> {
     if (!meetingTypeId) {
@@ -126,8 +99,9 @@ export function BookPage() {
         setAvailability(data)
       }
     } catch {
-      // При ошибке перечитывания остаётся локальная пометка конфликтного
-      // слота; остальные статусы обновятся при следующей загрузке.
+      // Сбой перечитывания не ломает интерфейс: гость продолжает работу,
+      // а актуальные статусы придут при следующем обновлении. Локально
+      // статусы слотов не помечаются (спецификация §11).
     }
   }
 
@@ -141,7 +115,7 @@ export function BookPage() {
     setSubmitError(null)
 
     try {
-      const { data, error } = await createBooking({
+      const { error } = await createBooking({
         body: {
           meetingTypeId,
           start: selectedSlot.start,
@@ -158,7 +132,6 @@ export function BookPage() {
           setSubmitError(error.message)
           setFormOpen(false)
           setSelectedSlot(null)
-          markSlotTaken(selectedSlot.start, selectedSlot.end)
           void refreshAvailability()
           return
         }
@@ -166,11 +139,12 @@ export function BookPage() {
         return
       }
 
-      markSlotTaken(data.start, data.end)
       setBookedSlot(selectedSlot)
       setFormOpen(false)
       // Слот занят: до нового выбора «Продолжить» неактивна (§11).
       setSelectedSlot(null)
+      // Подтверждение не ждёт перечитывания: статусы обновляются фоном.
+      void refreshAvailability()
     } catch {
       setSubmitError('Не удалось отправить бронь. Попробуйте ещё раз.')
     } finally {
