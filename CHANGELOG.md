@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0](https://github.com/alexmyt/ai-for-developers-project-387/compare/v0.4.0...v0.5.0) (2026-11-19)
+
+
+### Features
+
+* add issue triage workflow to automate issue handling ([b7d076a](https://github.com/alexmyt/ai-for-developers-project-387/commit/b7d076a6e15d27302c9c65575a86194560eb509b))
+
+
+### Bug Fixes
+
+* **ci:** prevent bot accounts from triggering opencode actions ([fbd5847](https://github.com/alexmyt/ai-for-developers-project-387/commit/fbd5847f51401fed83c817fa4205911f249669d8))
+* **ci:** repair mise lock digest for opencode sidecar ([67f6005](https://github.com/alexmyt/ai-for-developers-project-387/commit/67f60058ab5be2cc0d8e11b617e0ef27c546c768))
+* **ci:** use the deepseek model id available to the gateway key ([95b6a94](https://github.com/alexmyt/ai-for-developers-project-387/commit/95b6a9420b2fa5f8429dfef72eed72d34fa833f3))
+* **workflow:** skip opencode triage for bot authors, pass jactionlint ([96c4bed](https://github.com/alexmyt/ai-for-developers-project-387/commit/96c4bed6caf7100bc2bc3fc1db0348a20d71438c))
+
 ## [0.4.0](https://github.com/alexmyt/ai-for-developers-project-386/compare/v0.3.0...v0.4.0) (2026-11-14)
 
 
