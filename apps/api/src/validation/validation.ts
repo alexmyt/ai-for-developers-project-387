@@ -1,7 +1,7 @@
-// Общие помощники валидации запросов: единый конверт ошибок и каскад
-// «обязательно → строка» для каждого поля (спецификация §8, §10).
-// Порядок проверок фиксирует спецификация, поэтому помощники не меняют
-// ни порядок, ни дословные тексты сообщений.
+// Общие помощники валидации запросов: единый конверт ошибок и проверка
+// формы тела (спецификация §8, §10). Порядок проверок фиксирует
+// спецификация, поэтому помощники не меняют ни порядок, ни дословные
+// тексты сообщений.
 
 import { HttpException, HttpStatus } from '@nestjs/common'
 
@@ -16,20 +16,4 @@ export function requireJsonObject(request: unknown): Record<string, unknown> {
     throw validationError('Тело запроса должно быть объектом JSON')
   }
   return request as Record<string, unknown>
-}
-
-/**
- * Обязательное строковое поле: сначала «обязательно», затем «строка»
- * (порядок проверок спецификации §8). Значение возвращается без изменений —
- * нормализация (trim, разбор формата) остаётся в вызывающей валидации.
- */
-export function requireStringField(body: Record<string, unknown>, field: string): string {
-  const value = body[field]
-  if (value === undefined) {
-    throw validationError(`Поле ${field} обязательно`)
-  }
-  if (typeof value !== 'string') {
-    throw validationError(`Поле ${field} должно быть строкой`)
-  }
-  return value
 }
