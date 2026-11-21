@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { createBooking, getAvailability, listMeetingTypes } from '@repo/sdk'
 import type { Availability, AvailabilityDay, AvailabilitySlot, MeetingType } from '@repo/sdk'
@@ -34,6 +34,10 @@ export function BookPage() {
   // возвращается к выбору слота, не теряя введённое (§11).
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
+
+  // Номер последнего перечитывания: ответы могут обгонять друг друга,
+  // поэтому устаревший снимок не должен затирать более новый (§11).
+  const refreshRequestId = useRef(0)
 
   useEffect(() => {
     if (!meetingTypeId) {
@@ -93,9 +97,12 @@ export function BookPage() {
     if (!meetingTypeId) {
       return
     }
+    const requestId = ++refreshRequestId.current
     try {
       const { data, error } = await getAvailability({ query: { meetingTypeId } })
-      if (!error && data) {
+      // Применяем только ответ последнего запроса: иначе медленный старый
+      // снимок вернёт занятый слот в «Свободно» (спецификация §11).
+      if (!error && data && requestId === refreshRequestId.current) {
         setAvailability(data)
       }
     } catch {

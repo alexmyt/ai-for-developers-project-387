@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -485,6 +485,63 @@ describe('Страница записи', () => {
     // Введённое не потерялось между шагами (спецификация §11).
     expect(screen.getByLabelText('Имя')).toHaveValue('Анна')
     expect(screen.getByLabelText('Email')).toHaveValue('anna@example.com')
+  })
+
+  it('игнорирует устаревший ответ перечитывания, пришедший последним', async () => {
+    const user = userEvent.setup()
+    // Две перекрывающиеся брони: R1 запущена первой, R2 — второй, но
+    // ответы приходят в обратном порядке (спецификация §11).
+    const staleRefresh = deferredAvailability()
+    const freshRefresh = deferredAvailability()
+    vi.mocked(getAvailability)
+      .mockReset()
+      .mockResolvedValueOnce({
+        data: availabilityWithFirstDay([freeSlot, morningSlot]),
+        error: undefined,
+      })
+      .mockReturnValueOnce(staleRefresh.promise)
+      .mockReturnValueOnce(freshRefresh.promise)
+    vi.mocked(createBooking).mockResolvedValue({ data: bookingFixture, error: undefined })
+    renderBookPage()
+
+    // Бронь A на 10:00 запускает перечитывание R1, которое ещё не ответило.
+    await user.click(await screen.findByRole('button', { name: /10:00–10:30/ }))
+    await user.click(screen.getByRole('button', { name: 'Продолжить' }))
+    await user.type(screen.getByLabelText('Имя'), 'Анна')
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com')
+    await user.click(screen.getByRole('button', { name: 'Подтвердить запись' }))
+    await waitFor(() => {
+      expect(vi.mocked(getAvailability)).toHaveBeenCalledTimes(2)
+    })
+
+    // Пока R1 в пути, бронь B на 09:00 запускает R2 (данные гостя сохранены).
+    await user.click(screen.getByRole('button', { name: /09:00–09:30/ }))
+    await user.click(screen.getByRole('button', { name: 'Продолжить' }))
+    await user.click(screen.getByRole('button', { name: 'Подтвердить запись' }))
+    await waitFor(() => {
+      expect(vi.mocked(getAvailability)).toHaveBeenCalledTimes(3)
+    })
+
+    // Свежий R2 приходит первым: оба слота заняты.
+    freshRefresh.resolve(
+      availabilityWithFirstDay([
+        { ...freeSlot, status: 'taken' },
+        { ...morningSlot, status: 'taken' },
+      ]),
+    )
+    await waitFor(() => {
+      expect(screen.getByText('10:00–10:30 МСК').closest('li')).toHaveTextContent('Занято')
+    })
+    expect(screen.getByText('09:00–09:30 МСК').closest('li')).toHaveTextContent('Занято')
+
+    // Устаревший R1 приходит последним со свободными слотами и не применяется.
+    await act(async () => {
+      staleRefresh.resolve(availabilityWithFirstDay([freeSlot, morningSlot]))
+    })
+
+    expect(screen.getByText('10:00–10:30 МСК').closest('li')).toHaveTextContent('Занято')
+    expect(screen.getByText('09:00–09:30 МСК').closest('li')).toHaveTextContent('Занято')
+    expect(screen.getByText('Свободных слотов на этот день: 0')).toBeVisible()
   })
 
   it('после конфликта перечитывает календарь и не помечает слот локально', async () => {
