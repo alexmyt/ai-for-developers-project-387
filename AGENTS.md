@@ -24,6 +24,9 @@ pnpm lint          # только ESLint
 - `apps/api` — бэкенд на NestJS, состояние в памяти, отдаёт `/api` и статику.
 - `apps/web` — фронтенд на React + Vite, SPA гостя и владельца.
 - `packages/contract` — TypeSpec, источник истины; из него генерируется `openapi.json`.
+- `packages/interval` — пакет `@repo/interval`: тип `Interval` и функция
+  `intervalsIntersect` — единственное место формулы Конфликта в исполняемом
+  коде; семантика полуоткрытых `[start, end)`, касание границ — не конфликт (ADR-0003).
 - `packages/sdk` — клиент для фронтенда, сгенерированный из `openapi.json`.
 
 Монорепо на pnpm workspaces, контракт-first: сначала TypeSpec, потом API и SDK.
