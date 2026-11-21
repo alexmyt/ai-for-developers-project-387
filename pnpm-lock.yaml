@@ -211,6 +211,9 @@ importers:
       '@repo/interval':
         specifier: workspace:*
         version: link:../../packages/interval
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       async-mutex:
         specifier: ^0.5.0
         version: 0.5.0
@@ -239,9 +242,6 @@ importers:
       '@types/supertest':
         specifier: 7.2.1
         version: 7.2.1
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
       supertest:
         specifier: 7.3.2
         version: 7.3.2
