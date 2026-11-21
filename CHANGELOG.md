@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.0](https://github.com/alexmyt/ai-for-developers-project-387/compare/v0.5.0...v0.6.0) (2026-11-21)
+
+
+### Features
+
+* **interval:** вынести intervalsIntersect в пакет @repo/interval ([13ccdb9](https://github.com/alexmyt/ai-for-developers-project-387/commit/13ccdb9653ed671e98458faa832b41c0c955ce2f)), closes [#4](https://github.com/alexmyt/ai-for-developers-project-387/issues/4)
+
+
+### Bug Fixes
+
+* **workflow:** extend review model timeout to 480 seconds ([f8f77a2](https://github.com/alexmyt/ai-for-developers-project-387/commit/f8f77a28a61caf4a296fbc3896937597356a6413))
+* **workflow:** publish full review as pr review body ([b1469aa](https://github.com/alexmyt/ai-for-developers-project-387/commit/b1469aa06c0073d546026776e81215a04570010e))
+* **workflow:** simplify opencode PR review to summary comment ([7a36758](https://github.com/alexmyt/ai-for-developers-project-387/commit/7a36758a59b64cc0f6aea3237c41dbd0d5110f8a))
+* **workflow:** unblock opencode on external directory permission ([4bd3bb5](https://github.com/alexmyt/ai-for-developers-project-387/commit/4bd3bb51e5ff8dce380311040e671ca5ffa65d9a))
+* **workflow:** use lowercase log level for opencode review ([a88137c](https://github.com/alexmyt/ai-for-developers-project-387/commit/a88137ccbe881a1d37b334b31207cca25ae2e83e))
+* строить @repo/interval до typecheck и тестов ([fffba51](https://github.com/alexmyt/ai-for-developers-project-387/commit/fffba51ccb378a366ebe039079c2fef6a72e2514)), closes [#6](https://github.com/alexmyt/ai-for-developers-project-387/issues/6)
+
 ## [0.5.0](https://github.com/alexmyt/ai-for-developers-project-387/compare/v0.4.0...v0.5.0) (2026-11-19)
 
 
