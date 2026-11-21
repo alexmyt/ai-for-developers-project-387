@@ -14,6 +14,7 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY apps/e2e/package.json apps/e2e/
 COPY packages/contract/package.json packages/contract/
+COPY packages/interval/package.json packages/interval/
 COPY packages/sdk/package.json packages/sdk/
 RUN pnpm install --frozen-lockfile
 

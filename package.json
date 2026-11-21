@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --filter @repo/contract build && pnpm -r --parallel dev",
+    "dev": "pnpm --filter @repo/contract build && pnpm --filter @repo/interval build && pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "generate": "pnpm --filter @repo/contract build && pnpm --filter @repo/sdk generate",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm generate && git diff --exit-code -- packages/contract/openapi.json packages/sdk/src && pnpm --filter @repo/e2e e2e",
