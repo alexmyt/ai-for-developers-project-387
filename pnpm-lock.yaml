@@ -205,6 +205,9 @@ importers:
       '@nestjs/serve-static':
         specifier: 12.1.1
         version: 12.1.1(@nestjs/common@12.4.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.4.2)(express@5.3.0)
+      '@repo/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
       '@repo/interval':
         specifier: workspace:*
         version: link:../../packages/interval
