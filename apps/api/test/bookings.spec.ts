@@ -179,6 +179,9 @@ describe('POST /api/bookings', () => {
       .expect(201)
   })
 
+  // Нарушения, выраженные в схеме контракта: лимиты, шаблоны и обязательность
+  // исполняются из openapi.json. Правка ограничения в main.tsp с регенерацией
+  // контракта валит эти кейсы без правки кода API.
   it.each([
     {
       name: 'нет поля meetingTypeId',
@@ -197,39 +200,16 @@ describe('POST /api/bookings', () => {
       body: { meetingTypeId: 'intro', start: 42, name: 'Анна', email: 'anna@example.com' },
     },
     {
-      name: 'start не ISO-инстант',
-      body: {
-        meetingTypeId: 'intro',
-        start: '2026-11-12 10:00:00',
-        name: 'Анна',
-        email: 'anna@example.com',
-      },
-    },
-    {
-      name: 'start без Z',
-      body: {
-        meetingTypeId: 'intro',
-        start: '2026-11-12T07:00:00',
-        name: 'Анна',
-        email: 'anna@example.com',
-      },
-    },
-    {
-      name: 'start — не существующая дата',
-      body: {
-        meetingTypeId: 'intro',
-        start: '2026-11-31T07:00:00Z',
-        name: 'Анна',
-        email: 'anna@example.com',
-      },
-    },
-    {
       name: 'нет поля name',
       body: { meetingTypeId: 'intro', start: NOV12_AT(10), email: 'anna@example.com' },
     },
     {
       name: 'name пустой после trim',
       body: { meetingTypeId: 'intro', start: NOV12_AT(10), name: '   ', email: 'anna@example.com' },
+    },
+    {
+      name: 'name не строка',
+      body: { meetingTypeId: 'intro', start: NOV12_AT(10), name: 42, email: 'anna@example.com' },
     },
     {
       name: 'name длиннее 100 символов',
@@ -239,10 +219,6 @@ describe('POST /api/bookings', () => {
         name: 'А'.repeat(101),
         email: 'anna@example.com',
       },
-    },
-    {
-      name: 'name не строка',
-      body: { meetingTypeId: 'intro', start: NOV12_AT(10), name: 42, email: 'anna@example.com' },
     },
     { name: 'нет поля email', body: { meetingTypeId: 'intro', start: NOV12_AT(10), name: 'Анна' } },
     {
@@ -273,7 +249,8 @@ describe('POST /api/bookings', () => {
         meetingTypeId: 'intro',
         start: NOV12_AT(10),
         name: 'Анна',
-        email: `${'a'.repeat(250)}@example.com`,
+        // Ровно 255 символов: на единицу за границей контракта.
+        email: `${'a'.repeat(243)}@example.com`,
       },
     },
   ])('отвечает 400 validation_error, когда $name', async ({ body }) => {
@@ -284,6 +261,59 @@ describe('POST /api/bookings', () => {
     expect(typeof response.body.message).toBe('string')
     expect(response.body.message.length).toBeGreaterThan(0)
     expect(() => expectValidResponse('post', '/api/bookings', 400, response.body)).not.toThrow()
+  })
+
+  // Semantic-проверки формата и существования даты схемой не выражаются
+  // (validateFormats выключен сознательно) — остаются ручными (§8).
+  it.each([
+    {
+      name: 'start не ISO-инстант',
+      body: {
+        meetingTypeId: 'intro',
+        start: '2026-11-12 10:00:00',
+        name: 'Анна',
+        email: 'anna@example.com',
+      },
+    },
+    {
+      name: 'start без Z',
+      body: {
+        meetingTypeId: 'intro',
+        start: '2026-11-12T07:00:00',
+        name: 'Анна',
+        email: 'anna@example.com',
+      },
+    },
+    {
+      name: 'start — не существующая дата',
+      body: {
+        meetingTypeId: 'intro',
+        start: '2026-11-31T07:00:00Z',
+        name: 'Анна',
+        email: 'anna@example.com',
+      },
+    },
+  ])('отвечает 400 validation_error на ручной проверке даты, когда $name', async ({ body }) => {
+    const response = await request(app.getHttpServer()).post('/api/bookings').send(body).expect(400)
+
+    expect(response.body).toMatchObject({ code: 'validation_error' })
+    expect(typeof response.body.message).toBe('string')
+  })
+
+  it('принимает граничные длины полей из контракта: name 100, email 254', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/bookings')
+      .send({
+        meetingTypeId: 'intro',
+        start: NOV12_AT(10),
+        name: 'А'.repeat(100),
+        email: `${'a'.repeat(242)}@example.com`,
+      })
+      .expect(201)
+
+    // Граница контракта допустима; при её правке в main.tsp тест перестанет
+    // проходить — исполнение схемы из openapi.json это ловит.
+    expect((response.body as Record<string, unknown>).guestName).toBe('А'.repeat(100))
   })
 
   it('отвечает 400 validation_error, когда тела запроса нет', async () => {

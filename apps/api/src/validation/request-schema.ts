@@ -36,7 +36,7 @@ export function violationMessage(errors: ErrorObject[], checks: readonly FieldMe
   for (const check of checks) {
     const fieldErrors = errors.filter((error) => matchesField(error, check.field))
     for (const [keyword, message] of Object.entries(check.messages)) {
-      if (fieldErrors.some((error) => error.keyword === keyword)) {
+      if (message !== undefined && fieldErrors.some((error) => error.keyword === keyword)) {
         return message
       }
     }
