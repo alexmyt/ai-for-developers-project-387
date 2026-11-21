@@ -260,6 +260,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@repo/interval':
+        specifier: workspace:*
+        version: link:../../packages/interval
       '@repo/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk

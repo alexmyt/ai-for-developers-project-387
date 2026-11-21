@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { createBooking, getAvailability, listMeetingTypes } from '@repo/sdk'
 import type { Availability, AvailabilityDay, AvailabilitySlot, MeetingType } from '@repo/sdk'
+import { intervalsIntersect } from '@repo/interval'
 import { INPUT_LIMITS, dayLabel, dateHeadingLabel, slotLabel } from '../lib/calendar-ui'
 
 // Страница записи: календарь на 14 дней и двухшаговый выбор — свободный
@@ -88,12 +89,12 @@ export function BookPage() {
    * Забронированный интервал делает занятыми все пересекающие его слоты,
    * а не только слот с точным совпадением старта: у типа на 60 минут занят
    * и соседний старт через 30 минут (§6 — занятый слот не предлагается
-   * свободным). Интервалы полуоткрытые [start, end): касание границами
-   * не пересечение — та же логика, что на сервере (booking.domain.ts).
+   * свободным). ISO-строки DTO нормализуются в Date здесь, на границе
+   * вызова: интервалы полуоткрытые [start, end), пересечение считает
+   * @repo/interval — единственное место формулы Конфликта (ADR-0003).
    */
   function markSlotTaken(startIso: string, endIso: string): void {
-    const bookedStart = new Date(startIso).getTime()
-    const bookedEnd = new Date(endIso).getTime()
+    const booking = { start: new Date(startIso), end: new Date(endIso) }
     setAvailability((prev) =>
       prev
         ? {
@@ -101,10 +102,13 @@ export function BookPage() {
             days: prev.days.map((day) => ({
               ...day,
               slots: day.slots.map((slot) => {
-                const intersects =
-                  bookedStart < new Date(slot.end).getTime() &&
-                  new Date(slot.start).getTime() < bookedEnd
-                return intersects ? { ...slot, status: 'taken' as const } : slot
+                const slotInterval = {
+                  start: new Date(slot.start),
+                  end: new Date(slot.end),
+                }
+                return intervalsIntersect(booking, slotInterval)
+                  ? { ...slot, status: 'taken' as const }
+                  : slot
               }),
             })),
           }
