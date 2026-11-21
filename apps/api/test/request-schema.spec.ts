@@ -1,49 +1,15 @@
 import { HttpException } from '@nestjs/common'
 import { describe, expect, it } from 'vitest'
+import openapiJson from '@repo/contract/openapi.json'
+import { FIELD_MESSAGES as BOOKING_CHECKS } from '../src/occupancy/booking-validation'
+import { FIELD_MESSAGES as MEETING_TYPE_CHECKS } from '../src/meeting-types/meeting-type-validation'
 import {
   assertRequestBodyMatchesSchema,
   type FieldMessages,
 } from '../src/validation/request-schema'
 
-// Маппинги нарушений схемы на русские тексты — такие же, как у request-
-// валидаторов API; здесь они проверяют сам механизм исполнения схем.
-const BOOKING_CHECKS: FieldMessages[] = [
-  {
-    field: 'meetingTypeId',
-    messages: {
-      required: 'Поле meetingTypeId обязательно',
-      type: 'Поле meetingTypeId должно быть строкой',
-    },
-  },
-  {
-    field: 'name',
-    messages: {
-      required: 'Поле name обязательно',
-      type: 'Поле name должно быть строкой',
-      minLength: 'Поле name должно быть от 1 до 100 символов',
-      maxLength: 'Поле name должно быть от 1 до 100 символов',
-    },
-  },
-  {
-    field: 'email',
-    messages: {
-      required: 'Поле email обязательно',
-      type: 'Поле email должно быть строкой',
-      maxLength: 'Поле email должно быть не длиннее 254 символов',
-      pattern: 'Поле email должно содержать «@» и точку в домене и не должно содержать пробелов',
-    },
-  },
-]
-
-const MEETING_TYPE_CHECKS: FieldMessages[] = [
-  {
-    field: 'description',
-    messages: {
-      type: 'Поле description должно быть строкой или null',
-      maxLength: 'Поле description должно быть не длиннее 500 символов',
-    },
-  },
-]
+// Маппинги нарушений схемы на русские тексты — продовые, из request-
+// валидаторов API: тест механизма видит настоящие тексты и ловит их дрейф.
 
 // Валидное тело брони: все ограничения схемы контракта соблюдены.
 const VALID_BOOKING = {
@@ -98,6 +64,27 @@ describe('assertRequestBodyMatchesSchema', () => {
     ).toBe('Поле email должно быть не длиннее 254 символов')
   })
 
+  it('ручная проверка поля встаёт в порядок проверок между schema-нарушениями', () => {
+    // Не-ISO start — ручная проверка (format схемой не исполняется),
+    // нарушение длины name — из схемы: в порядке §8 ISO-формат start
+    // проверялся раньше длины name, побеждает текст про start.
+    expect(
+      messageOf(
+        'post',
+        '/api/bookings',
+        { ...VALID_BOOKING, start: '2026-11-12 07:00:00', name: 'А'.repeat(101) },
+        BOOKING_CHECKS,
+      ),
+    ).toBe('Поле start должно быть UTC-инстантом в формате ISO 8601 с Z')
+  })
+
+  it('ручная проверка не срабатывает, когда поле violates схему раньше неё', () => {
+    // Нестроковый start не доходит до ручной ISO-проверки: тип — из схемы.
+    expect(
+      messageOf('post', '/api/bookings', { ...VALID_BOOKING, start: 42 }, BOOKING_CHECKS),
+    ).toBe('Поле start должно быть строкой')
+  })
+
   it('транслирует OpenAPI nullable: null проходит, скаляр отклоняется', () => {
     const body = { id: 'review', title: 'Обзор проекта', durationMinutes: 30 }
     expect(() =>
@@ -125,5 +112,58 @@ describe('assertRequestBodyMatchesSchema', () => {
     expect(() =>
       assertRequestBodyMatchesSchema('post', '/api/no-such-path', VALID_BOOKING, BOOKING_CHECKS),
     ).toThrow('В openapi.json нет схемы тела для POST /api/no-such-path')
+  })
+})
+
+// Селектор нарушений в request-schema.ts рассчитан на плоские тела:
+// путь нарушения — '/field'. Появление вложенных объектов или массивов
+// в схемах request-телов ломает сопоставление полей — тест ниже падает
+// и напомнит расширить селектор.
+const openapi = openapiJson as {
+  paths: Record<
+    string,
+    Record<string, { requestBody?: { content: Record<string, { schema: unknown }> } } | undefined>
+  >
+  components: { schemas: Record<string, unknown> }
+}
+
+interface SchemaNode {
+  type?: unknown
+  $ref?: string
+  properties?: Record<string, unknown>
+  items?: unknown
+}
+
+/** Разыменовывает $ref в компонентах контракта; без $ref возвращает узел как есть. */
+function resolve(node: unknown): SchemaNode {
+  const ref = (node as SchemaNode).$ref
+  if (ref === undefined) {
+    return node as SchemaNode
+  }
+  return openapi.components.schemas[ref.replace('#/components/schemas/', '')] as SchemaNode
+}
+
+describe('плоские тела запроса', () => {
+  it('поля схем request-телов — скаляры, без вложенных объектов и массивов', () => {
+    for (const [path, operations] of Object.entries(openapi.paths)) {
+      const schema = operations.post?.requestBody?.content['application/json']?.schema
+      if (schema === undefined) {
+        continue
+      }
+      const body = resolve(schema)
+      expect(body.type, `POST ${path}: тело — объект`).toBe('object')
+      for (const [name, field] of Object.entries(body.properties ?? {})) {
+        const resolved = resolve(field)
+        expect(
+          ['string', 'number', 'integer', 'boolean'],
+          `POST ${path}: поле ${name} — скаляр`,
+        ).toContain(resolved.type)
+        expect(
+          resolved.properties,
+          `POST ${path}: поле ${name} без вложенных объектов`,
+        ).toBeUndefined()
+        expect(resolved.items, `POST ${path}: поле ${name} без массивов`).toBeUndefined()
+      }
+    }
   })
 })
