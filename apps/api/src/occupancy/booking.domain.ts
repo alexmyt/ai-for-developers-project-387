@@ -1,26 +1,11 @@
 // Чистая логика брони: порядок проверок §8, окно записи, сетка и пересечения
 // (спецификация §4, §5, §8, docs/spec/calendar.md). Текущее время передаётся
 // снаружи через Clock (ADR-0003), поэтому функции детерминированы.
+import { intervalsIntersect, type Interval } from '@repo/interval'
 import { BOOKING_WINDOW_DAYS } from '../config/calendar'
 import type { MeetingType } from '../meeting-types/meeting-type'
 import { addDays, moscowDateString } from './moscow-time'
 import { buildDayGrid } from './slot-grid'
-
-/** Интервал-кандидат: проверяемая бронь или существующая бронь (§5). */
-export interface Interval {
-  /** Полуоткрытый интервал [start, end): касание границами — не конфликт. */
-  start: Date
-  end: Date
-}
-
-/**
- * Пересечение полуоткрытых интервалов: a.start < b.end && b.start < a.end.
- * Касание границами конфликтом не считается, частичное наложение любых
- * типов встреч запрещено (спецификация §5).
- */
-export function intervalsIntersect(a: Interval, b: Interval): boolean {
-  return a.start.getTime() < b.end.getTime() && b.start.getTime() < a.end.getTime()
-}
 
 /**
  * Старт строго после текущего момента (спецификация §4, §8): единственный
