@@ -134,8 +134,9 @@ describe('POST /api/meeting-types', () => {
         description: 'Д'.repeat(500),
         durationMinutes: 30,
       },
-      // durationMinutes на верхней границе.
-      { id: 'duration-edge', title: 'Обзор проекта', durationMinutes: 240 },
+      // durationMinutes на нижней и верхней границе.
+      { id: 'duration-lower-edge', title: 'Обзор проекта', durationMinutes: 30 },
+      { id: 'duration-upper-edge', title: 'Обзор проекта', durationMinutes: 240 },
     ]
 
     for (const [index, body] of cases.entries()) {
@@ -145,6 +146,9 @@ describe('POST /api/meeting-types', () => {
     }
   })
 
+  // Нарушения, выраженные в схеме контракта: лимиты, шаблон id, границы
+  // и шаг длительности исполняются из openapi.json. Правка ограничения
+  // в main.tsp с регенерацией контракта валит эти кейсы без правки кода API.
   it.each([
     {
       name: 'id отсутствует',
@@ -234,22 +238,15 @@ describe('POST /api/meeting-types', () => {
     ).not.toThrow()
   })
 
-  it('отвечает 400 validation_error, когда тела запроса нет', async () => {
-    const response = await request(app.getHttpServer()).post('/api/meeting-types').expect(400)
-
-    expect(response.body).toMatchObject({ code: 'validation_error' })
-    expect(() =>
-      expectValidResponse('post', '/api/meeting-types', 400, response.body),
-    ).not.toThrow()
-  })
-
-  it('отвечает 400 validation_error, когда тело — массив', async () => {
-    // Массив доходит до контроллера и должен попасть в проверку формы:
-    // телом запроса может быть только объект.
-    const response = await request(app.getHttpServer())
-      .post('/api/meeting-types')
-      .send([1, 2, 3])
-      .expect(400)
+  // Форма запроса — объект JSON — ручная проверка до исполнения схемы (§6.1):
+  // отсутствующее тело и массив отклоняет requireJsonObject, а не селектор
+  // полей схемы.
+  it.each([
+    { name: 'тела запроса нет', body: undefined },
+    { name: 'тело — массив', body: [1, 2, 3] },
+  ])('отвечает 400 validation_error ручной проверки формы, когда $name', async ({ body }) => {
+    const req = request(app.getHttpServer()).post('/api/meeting-types')
+    const response = await (body === undefined ? req : req.send(body)).expect(400)
 
     expect(response.body).toMatchObject({ code: 'validation_error' })
   })

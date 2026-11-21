@@ -14,7 +14,7 @@ export interface CreateMeetingTypeInput {
 // и границы с шагом длительности исполняются из openapi.json, здесь только
 // тексты; числа в текстах — значения контракта. Порядок полей — порядок
 // проверок §6.1, порядок ключей — приоритет внутри поля.
-const FIELD_MESSAGES: FieldMessages[] = [
+export const FIELD_MESSAGES: FieldMessages[] = [
   {
     field: 'id',
     messages: {

@@ -263,6 +263,25 @@ describe('POST /api/bookings', () => {
     expect(() => expectValidResponse('post', '/api/bookings', 400, response.body)).not.toThrow()
   })
 
+  // Порядок сообщений внутри validation_error — прежний порядок проверок §8:
+  // ISO-формат start проверялся раньше длины name, текст — про start.
+  it('ISO-формат start в сообщении раньше длины name при комбинированном нарушении', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/bookings')
+      .send({
+        meetingTypeId: 'intro',
+        start: '2026-11-12 10:00:00',
+        name: 'А'.repeat(101),
+        email: 'anna@example.com',
+      })
+      .expect(400)
+
+    expect(response.body).toMatchObject({
+      code: 'validation_error',
+      message: 'Поле start должно быть UTC-инстантом в формате ISO 8601 с Z',
+    })
+  })
+
   // Semantic-проверки формата и существования даты схемой не выражаются
   // (validateFormats выключен сознательно) — остаются ручными (§8).
   it.each([

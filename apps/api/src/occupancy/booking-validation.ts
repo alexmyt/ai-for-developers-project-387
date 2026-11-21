@@ -14,6 +14,9 @@ export interface CreateBookingInput {
 // (спецификация §3). Дробные секунды допустимы.
 const ISO_INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/
 
+/** Сообщение ручной проверки ISO-формата и существования даты start (§8). */
+const START_NOT_INSTANT_MESSAGE = 'Поле start должно быть UTC-инстантом в формате ISO 8601 с Z'
+
 /**
  * Разбирает ISO-инстант с проверкой компонентов: JS перекатывает
  * несуществующие даты (31 ноября превращается в 1 декабря), поэтому
@@ -46,8 +49,9 @@ function parseIsoInstant(value: string): Date | null {
 // Сообщения нарушений схемы контракта (спецификация §8). Лимиты длины и
 // шаблон email исполняются из openapi.json, здесь только тексты; числа в
 // текстах — значения контракта. Порядок полей — порядок проверок §8,
-// порядок ключей — приоритет внутри поля.
-const FIELD_MESSAGES: FieldMessages[] = [
+// порядок ключей — приоритет внутри поля; ручная проверка ISO-формата
+// start идёт после типа start и раньше полей name и email.
+export const FIELD_MESSAGES: FieldMessages[] = [
   {
     field: 'meetingTypeId',
     messages: {
@@ -60,6 +64,14 @@ const FIELD_MESSAGES: FieldMessages[] = [
     messages: {
       required: 'Поле start обязательно',
       type: 'Поле start должно быть строкой',
+      manual: START_NOT_INSTANT_MESSAGE,
+    },
+    // Формат date-time схемой сознательно не исполняется (ajv без
+    // validateFormats), а существование даты схемой не выражается:
+    // разбор с проверкой компонентов возвращает null для обоих случаев.
+    manual: (body) => {
+      const start = (body as Record<string, unknown>).start
+      return typeof start === 'string' && parseIsoInstant(start) === null
     },
   },
   {
@@ -96,13 +108,14 @@ export function validateCreateBookingRequest(request: unknown): CreateBookingInp
 
   // Схема контракта исполняется первой: нарушение лимитов и шаблонов
   // отклоняется до любой бизнес-логики. Формат date-time схемой сознательно
-  // не проверяется (ajv без validateFormats), поэтому существование даты —
-  // следующая ручная semantic-проверка.
+  // не исполняется — его нарушение проверяет ручное правило из FIELD_MESSAGES
+  // на своём месте порядка §8 (после типа start, раньше name и email).
   assertRequestBodyMatchesSchema('post', '/api/bookings', { ...body, name }, FIELD_MESSAGES)
 
   const startInstant = parseIsoInstant(body.start as string)
   if (!startInstant) {
-    throw validationError('Поле start должно быть UTC-инстантом в формате ISO 8601 с Z')
+    // Недостижимо после схемы и ручной проверки выше — защита инварианта.
+    throw validationError(START_NOT_INSTANT_MESSAGE)
   }
 
   // Схема гарантирует, что поля — строки; приведение фиксирует этот инвариант.
