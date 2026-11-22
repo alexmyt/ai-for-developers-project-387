@@ -105,6 +105,8 @@ jobs:
         uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a # latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }} # имя секрета зависит от провайдера в model
+        with:
+          model: opencode/deepseek-v4.1-flash
 
       # Отделяем сбой самого агента от сбоя подготовки (бюджет, ключ):
       # шаг выполняется, только когда подготовка прошла успешно.
@@ -144,9 +146,10 @@ jobs:
             echo "Причин для отчёта нет — шаг завершается без комментария."
             exit 0
           fi
-          if [ "$REASON" = "limit_exhausted" ] && \
-            gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid > /dev/null 2>&1; then
-            # Для PR отчётный SHA — фактический head на момент отказа.
+          # Фактический head PR важен для любой причины, не только
+          # limit_exhausted: gh pr view работает и для issue_comment на PR.
+          # Фолбэк github.sha — только для обычного issue, где PR нет.
+          if gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid > /dev/null 2>&1; then
             sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
           else
             sha="$EVENT_SHA"
