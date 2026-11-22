@@ -144,10 +144,13 @@ opencode. Работа с issues и PR ведётся через него, от�
   `pull_request_review_comment`, только `types: [created]`).
 - **Команды.** Запуск — упоминание `/oc` или `/opencode` в комментарии,
   например «/oc объясни этот issue». Прогоны по остальным комментариям
-  и по ответам самого бота пропускаются (status `skipped`); право автора
-  на запуск проверяет экшен `anomalyco/opencode/github`.
+  и по ответам самого бота пропускаются (status `skipped`).
 - **Модель.** `opencode/deepseek-v4.1-flash`; ключ `OPENCODE_API_KEY`
   хранится в Actions Secrets.
+- **Доверенный автор.** Воркфлоу запускает агента только по комментарию
+  владельца репозитория (`author_association == 'OWNER'`) — чужой `/oc`
+  делает прогон `skipped`, не расходует бюджет и не порождает отчётов;
+  право автора дополнительно проверяет экшен `anomalyco/opencode/github`.
 - **Авторизация.** GitHub App + OIDC-обмен: checkout — с
   `persist-credentials: false`, комментарии и push делает App-токен.
   Write-права у job точечные: job агента держит `id-token: write` и

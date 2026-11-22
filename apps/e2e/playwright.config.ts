@@ -33,6 +33,9 @@ export default defineConfig({
     baseURL: REMOTE_BASE_URL ?? `http://localhost:${WEB_PORT}`,
     ...(REMOTE_BASE_URL && { navigationTimeout: 120_000 }),
   },
+  // list — прогресс в консоли, html — артефакт CI-прогона
+  // (.github/workflows/browser.yml): отчёт нужен и для успешного прогона.
+  reporter: [['list'], ['html', { open: 'never' }]],
   // На развёрнутом инстансе серверы уже подняты — локальные не запускаем.
   webServer: REMOTE_BASE_URL
     ? []

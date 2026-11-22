@@ -17,12 +17,16 @@ jobs:
   opencode:
     # Номер issue/PR зашит в имя job: по нему «Check run budget» отличает
     # попытки этого тикета от прогонов по другим тикетам.
+    # Доверенный автор проверяется здесь, до вызова модели и расхода
+    # бюджета: чужой /oc делает запуск skipped, который не считается
+    # попыткой и не порождает отчёт.
     name: opencode (PR #${{ github.event.issue.number || github.event.pull_request.number }})
     if: |
-      contains(github.event.comment.body, ' /oc') ||
+      github.event.comment.author_association == 'OWNER' &&
+      (contains(github.event.comment.body, ' /oc') ||
       startsWith(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, ' /opencode') ||
-      startsWith(github.event.comment.body, '/opencode')
+      startsWith(github.event.comment.body, '/opencode'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # id-token: write — OIDC-обмен на App-токен в экшене opencode.
@@ -60,8 +64,10 @@ jobs:
           # расходуют попытку. Текущий запуск ещё не завершён, поэтому
           # фильтруем только пропущенные (запуск без /oc не стоит попытки).
           # Комментарий PR служит отчётом и на бюджет не влияет.
+          # --paginate: после сотни прогонов по тикету история видна не
+          # вся — без обхода страниц счётчик занижался бы.
           runs="$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/opencode.yml/runs" \
-            -f created=">=$CREATED_AT" -f per_page=100 \
+            -f created=">=$CREATED_AT" -f per_page=100 --paginate \
             --jq '.workflow_runs[] | select(.event == "issue_comment" or .event == "pull_request_review_comment") | select(.conclusion != "skipped") | .id')"
           count=0
           while read -r run_id; do
@@ -127,7 +133,7 @@ jobs:
           PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
           REASON: >-
             ${{ needs.opencode.outputs.allowed == 'no' && 'limit_exhausted'
-            || needs.opencode.result == 'failure' && (needs.opencode.outputs.reason == 'infra' && 'infra' || 'agent_failed')
+            || needs.opencode.result == 'failure' && (needs.opencode.outputs.reason == 'agent_failed' && 'agent_failed' || 'infra')
             || '' }}
           ATTEMPTS: ${{ needs.opencode.outputs.count }}
           BUDGET_LIMIT: '3'
@@ -145,7 +151,8 @@ jobs:
           else
             sha="$EVENT_SHA"
           fi
-          logs_link="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempt/$GITHUB_RUN_ATTEMPT"
+          # Сегмент attempts (не attempt): форма /attempt/N даёт 404.
+          logs_link="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
           if [ "$REASON" = "limit_exhausted" ]; then
             detail="Использовано попыток: ${ATTEMPTS:-?} из $BUDGET_LIMIT. Новый бюджет получит только новый PR."
           else
