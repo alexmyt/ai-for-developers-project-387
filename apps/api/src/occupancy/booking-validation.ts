@@ -1,10 +1,6 @@
-import { requireJsonObject, requireStringField, validationError } from '../validation/validation'
-
-/** Имя гостя: 1–100 символов после trim (спецификация §8). */
-const GUEST_NAME_MAX_LENGTH = 100
-
-/** Email гостя: до 254 символов (спецификация §8). */
-const GUEST_EMAIL_MAX_LENGTH = 254
+import type { FieldMessages } from '../validation/request-schema'
+import { assertRequestBodyMatchesSchema } from '../validation/request-schema'
+import { requireJsonObject, validationError } from '../validation/validation'
 
 /** Нормализованные поля запроса на бронирование. */
 export interface CreateBookingInput {
@@ -17,6 +13,9 @@ export interface CreateBookingInput {
 // Формат utcDateTime из контракта: UTC-инстант в ISO 8601 с Z
 // (спецификация §3). Дробные секунды допустимы.
 const ISO_INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/
+
+/** Сообщение ручной проверки ISO-формата и существования даты start (§8). */
+const START_NOT_INSTANT_MESSAGE = 'Поле start должно быть UTC-инстантом в формате ISO 8601 с Z'
 
 /**
  * Разбирает ISO-инстант с проверкой компонентов: JS перекатывает
@@ -47,40 +46,83 @@ function parseIsoInstant(value: string): Date | null {
   return instant
 }
 
-// Email: до 254 символов, содержит @ и точку в домене, без пробелов (§8).
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// Сообщения нарушений схемы контракта (спецификация §8). Лимиты длины и
+// шаблон email исполняются из openapi.json, здесь только тексты; числа в
+// текстах — значения контракта. Порядок полей — порядок проверок §8,
+// порядок ключей — приоритет внутри поля; ручная проверка ISO-формата
+// start идёт после типа start и раньше полей name и email.
+export const FIELD_MESSAGES: FieldMessages[] = [
+  {
+    field: 'meetingTypeId',
+    messages: {
+      required: 'Поле meetingTypeId обязательно',
+      type: 'Поле meetingTypeId должно быть строкой',
+    },
+  },
+  {
+    field: 'start',
+    messages: {
+      required: 'Поле start обязательно',
+      type: 'Поле start должно быть строкой',
+      manual: START_NOT_INSTANT_MESSAGE,
+    },
+    // Формат date-time схемой сознательно не исполняется (ajv без
+    // validateFormats), а существование даты схемой не выражается:
+    // разбор с проверкой компонентов возвращает null для обоих случаев.
+    manual: (body) => {
+      const start = (body as Record<string, unknown>).start
+      return typeof start === 'string' && parseIsoInstant(start) === null
+    },
+  },
+  {
+    field: 'name',
+    messages: {
+      required: 'Поле name обязательно',
+      type: 'Поле name должно быть строкой',
+      minLength: 'Поле name должно быть от 1 до 100 символов',
+      maxLength: 'Поле name должно быть от 1 до 100 символов',
+    },
+  },
+  {
+    field: 'email',
+    messages: {
+      required: 'Поле email обязательно',
+      type: 'Поле email должно быть строкой',
+      maxLength: 'Поле email должно быть не длиннее 254 символов',
+      pattern: 'Поле email должно содержать «@» и точку в домене и не должно содержать пробелов',
+    },
+  },
+]
 
 /**
- * Проверяет форму и поля запроса на бронирование (спецификация §8) — первый
- * шаг порядка проверок, — и нормализует их: name обрезается. Нарушение —
- * 400 validation_error.
+ * Проверяет форму и поля запроса на бронирование (спецификация §8) и
+ * нормализует их: name обрезается. Нарушение — 400 validation_error.
  */
 export function validateCreateBookingRequest(request: unknown): CreateBookingInput {
   const body = requireJsonObject(request)
 
-  const meetingTypeId = requireStringField(body, 'meetingTypeId')
+  // Нормализация до исполнения схемы: контрактные лимиты применяются к
+  // тримированному значению, пробельная строка после trim пуста и отклоняется
+  // minLength схемы (спецификация §8).
+  const name = typeof body.name === 'string' ? body.name.trim() : body.name
 
-  const start = requireStringField(body, 'start')
-  const startInstant = parseIsoInstant(start)
+  // Схема контракта исполняется первой: нарушение лимитов и шаблонов
+  // отклоняется до любой бизнес-логики. Формат date-time схемой сознательно
+  // не исполняется — его нарушение проверяет ручное правило из FIELD_MESSAGES
+  // на своём месте порядка §8 (после типа start, раньше name и email).
+  assertRequestBodyMatchesSchema('post', '/api/bookings', { ...body, name }, FIELD_MESSAGES)
+
+  const startInstant = parseIsoInstant(body.start as string)
   if (!startInstant) {
-    throw validationError('Поле start должно быть UTC-инстантом в формате ISO 8601 с Z')
+    // Недостижимо после схемы и ручной проверки выше — защита инварианта.
+    throw validationError(START_NOT_INSTANT_MESSAGE)
   }
 
-  const name = requireStringField(body, 'name')
-  const trimmedName = name.trim()
-  if (trimmedName.length < 1 || trimmedName.length > GUEST_NAME_MAX_LENGTH) {
-    throw validationError(`Поле name должно быть от 1 до ${GUEST_NAME_MAX_LENGTH} символов`)
+  // Схема гарантирует, что поля — строки; приведение фиксирует этот инвариант.
+  return {
+    meetingTypeId: body.meetingTypeId as string,
+    start: startInstant,
+    name: name as string,
+    email: body.email as string,
   }
-
-  const email = requireStringField(body, 'email')
-  if (email.length > GUEST_EMAIL_MAX_LENGTH) {
-    throw validationError(`Поле email должно быть не длиннее ${GUEST_EMAIL_MAX_LENGTH} символов`)
-  }
-  if (!EMAIL_PATTERN.test(email)) {
-    throw validationError(
-      'Поле email должно содержать «@» и точку в домене и не должно содержать пробелов',
-    )
-  }
-
-  return { meetingTypeId, start: startInstant, name: trimmedName, email }
 }
