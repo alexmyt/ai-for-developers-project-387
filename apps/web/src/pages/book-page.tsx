@@ -1,8 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { createBooking, getAvailability, listMeetingTypes } from '@repo/sdk'
 import type { Availability, AvailabilityDay, AvailabilitySlot, MeetingType } from '@repo/sdk'
-import { intervalsIntersect } from '@repo/interval'
 import { INPUT_LIMITS, dayLabel, dateHeadingLabel, slotLabel } from '../lib/calendar-ui'
 
 // Страница записи: календарь на 14 дней и двухшаговый выбор — свободный
@@ -35,6 +34,10 @@ export function BookPage() {
   // возвращается к выбору слота, не теряя введённое (§11).
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
+
+  // Номер последнего перечитывания: ответы могут обгонять друг друга,
+  // поэтому устаревший снимок не должен затирать более новый (§11).
+  const refreshRequestId = useRef(0)
 
   useEffect(() => {
     if (!meetingTypeId) {
@@ -86,52 +89,26 @@ export function BookPage() {
   }
 
   /**
-   * Забронированный интервал делает занятыми все пересекающие его слоты,
-   * а не только слот с точным совпадением старта: у типа на 60 минут занят
-   * и соседний старт через 30 минут (§6 — занятый слот не предлагается
-   * свободным). ISO-строки DTO нормализуются в Date здесь, на границе
-   * вызова: интервалы полуоткрытые [start, end), пересечение считает
-   * @repo/interval — единственное место формулы Конфликта (ADR-0003).
-   */
-  function markSlotTaken(startIso: string, endIso: string): void {
-    const booking = { start: new Date(startIso), end: new Date(endIso) }
-    setAvailability((prev) =>
-      prev
-        ? {
-            ...prev,
-            days: prev.days.map((day) => ({
-              ...day,
-              slots: day.slots.map((slot) => {
-                const slotInterval = {
-                  start: new Date(slot.start),
-                  end: new Date(slot.end),
-                }
-                return intervalsIntersect(booking, slotInterval)
-                  ? { ...slot, status: 'taken' as const }
-                  : slot
-              }),
-            })),
-          }
-        : prev,
-    )
-  }
-
-  /**
-   * Перечитывает доступность через SDK: конфликтный слот и брони других
-   * гостей становятся занятыми (спецификация §11).
+   * Перечитывает доступность через SDK — единственный источник статусов
+   * слотов. Вызывается после успешной брони и после конфликта
+   * (спецификация §11).
    */
   async function refreshAvailability(): Promise<void> {
     if (!meetingTypeId) {
       return
     }
+    const requestId = ++refreshRequestId.current
     try {
       const { data, error } = await getAvailability({ query: { meetingTypeId } })
-      if (!error && data) {
+      // Применяем только ответ последнего запроса: иначе медленный старый
+      // снимок вернёт занятый слот в «Свободно» (спецификация §11).
+      if (!error && data && requestId === refreshRequestId.current) {
         setAvailability(data)
       }
     } catch {
-      // При ошибке перечитывания остаётся локальная пометка конфликтного
-      // слота; остальные статусы обновятся при следующей загрузке.
+      // Сбой перечитывания не ломает интерфейс: гость продолжает работу,
+      // а актуальные статусы придут при следующем обновлении. Локально
+      // статусы слотов не помечаются (спецификация §11).
     }
   }
 
@@ -145,7 +122,7 @@ export function BookPage() {
     setSubmitError(null)
 
     try {
-      const { data, error } = await createBooking({
+      const { error } = await createBooking({
         body: {
           meetingTypeId,
           start: selectedSlot.start,
@@ -162,7 +139,6 @@ export function BookPage() {
           setSubmitError(error.message)
           setFormOpen(false)
           setSelectedSlot(null)
-          markSlotTaken(selectedSlot.start, selectedSlot.end)
           void refreshAvailability()
           return
         }
@@ -170,11 +146,12 @@ export function BookPage() {
         return
       }
 
-      markSlotTaken(data.start, data.end)
       setBookedSlot(selectedSlot)
       setFormOpen(false)
       // Слот занят: до нового выбора «Продолжить» неактивна (§11).
       setSelectedSlot(null)
+      // Подтверждение не ждёт перечитывания: статусы обновляются фоном.
+      void refreshAvailability()
     } catch {
       setSubmitError('Не удалось отправить бронь. Попробуйте ещё раз.')
     } finally {
