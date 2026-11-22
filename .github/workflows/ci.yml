@@ -25,6 +25,17 @@ jobs:
       # в CI та же команда, что и локально — mise run check (см. AGENTS.md).
       - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5
 
+      # opencode.json читают два CLI: V1 1.19.6 ставит экшен /oc
+      # (opencode.yml, opencode-triage.yml), V2 2.3.0 из mise — ревью PR
+      # и локальные сессии. V2-only ключ из 4bd3bb5 прошёл все проверки,
+      # но сломал /oc после мержа (прогон 45017653171); страж ловит
+      # нечитаемый конфиг до слияния, а не первой попыткой бюджета.
+      - name: Validate opencode.json with both agent CLIs
+        run: |
+          set -euo pipefail
+          npx -y opencode-ai@1.19.6 models > /dev/null
+          opencode models > /dev/null
+
       - run: pnpm install --frozen-lockfile
 
       # Браузер для Playwright: mise run check завершается браузерным e2e
