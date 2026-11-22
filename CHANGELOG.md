@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.6.0](https://github.com/alexmyt/ai-for-developers-project-387/compare/v0.5.0...v0.6.0) (2026-11-22)
+
+
+### Features
+
+* **api:** исполнять JSON-схемы request-телов из openapi.json ([a03b101](https://github.com/alexmyt/ai-for-developers-project-387/commit/a03b101ff197bc0c2fc8e12685920ffc3240d34b)), closes [#8](https://github.com/alexmyt/ai-for-developers-project-387/issues/8)
+* **api:** исполнять схемы запросов из openapi.json, убрав ручные копии правил ([591290b](https://github.com/alexmyt/ai-for-developers-project-387/commit/591290b02d86c579798e5183be2b392d972b0600))
+* **interval:** вынести intervalsIntersect в пакет @repo/interval ([13ccdb9](https://github.com/alexmyt/ai-for-developers-project-387/commit/13ccdb9653ed671e98458faa832b41c0c955ce2f)), closes [#4](https://github.com/alexmyt/ai-for-developers-project-387/issues/4)
+
+
+### Bug Fixes
+
+* **api:** восстановить прежний приоритет сообщений проверок §8 ([be60a88](https://github.com/alexmyt/ai-for-developers-project-387/commit/be60a88a7d26e51f6ea84335ac8edadf036ed6c9)), closes [#8](https://github.com/alexmyt/ai-for-developers-project-387/issues/8)
+* **api:** перенести ajv в зависимости рантайма ([5deaf97](https://github.com/alexmyt/ai-for-developers-project-387/commit/5deaf974b380ea65677079972a578d87901c5d43)), closes [#8](https://github.com/alexmyt/ai-for-developers-project-387/issues/8)
+* **workflow:** change log level from INFO to info in OpenCode PR review step ([3802480](https://github.com/alexmyt/ai-for-developers-project-387/commit/38024805829c301135512aefa46243ce25d6a32b))
+* **workflow:** extend review model timeout to 480 seconds ([f8f77a2](https://github.com/alexmyt/ai-for-developers-project-387/commit/f8f77a28a61caf4a296fbc3896937597356a6413))
+* **workflow:** publish full review as pr review body ([b1469aa](https://github.com/alexmyt/ai-for-developers-project-387/commit/b1469aa06c0073d546026776e81215a04570010e))
+* **workflow:** simplify opencode PR review to summary comment ([7a36758](https://github.com/alexmyt/ai-for-developers-project-387/commit/7a36758a59b64cc0f6aea3237c41dbd0d5110f8a))
+* **workflow:** unblock opencode on external directory permission ([4bd3bb5](https://github.com/alexmyt/ai-for-developers-project-387/commit/4bd3bb51e5ff8dce380311040e671ca5ffa65d9a))
+* **workflow:** use lowercase log level for opencode review ([a88137c](https://github.com/alexmyt/ai-for-developers-project-387/commit/a88137ccbe881a1d37b334b31207cca25ae2e83e))
+* **workflow:** вернуть with: model и брать head SHA для всех причин ([8177342](https://github.com/alexmyt/ai-for-developers-project-387/commit/817734224094b9a067299a9106185c117260ca44))
+* **workflow:** публиковать отчёт при таймауте и уточнить SHA в отчёте ([e8cf5aa](https://github.com/alexmyt/ai-for-developers-project-387/commit/e8cf5aac49acc53f9f188e57d0a1b1efca7bcc51))
+* **workflow:** устранить находки авторевью бюджета и артефакта ([7a951c4](https://github.com/alexmyt/ai-for-developers-project-387/commit/7a951c4aff561e379ede3c71ff91a17cfcc8b65e))
+* строить @repo/interval до typecheck и тестов ([fffba51](https://github.com/alexmyt/ai-for-developers-project-387/commit/fffba51ccb378a366ebe039079c2fef6a72e2514)), closes [#6](https://github.com/alexmyt/ai-for-developers-project-387/issues/6)
+
 ## [0.5.0](https://github.com/alexmyt/ai-for-developers-project-387/compare/v0.4.0...v0.5.0) (2026-11-19)
 
 
