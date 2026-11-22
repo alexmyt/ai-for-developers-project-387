@@ -136,6 +136,7 @@ jobs:
           REASON: >-
             ${{ needs.opencode.outputs.allowed == 'no' && 'limit_exhausted'
             || needs.opencode.result == 'failure' && (needs.opencode.outputs.reason == 'agent_failed' && 'agent_failed' || 'infra')
+            || needs.opencode.result == 'cancelled' && 'timeout'
             || '' }}
           ATTEMPTS: ${{ needs.opencode.outputs.count }}
           BUDGET_LIMIT: '3'
@@ -148,23 +149,29 @@ jobs:
           fi
           # Фактический head PR важен для любой причины, не только
           # limit_exhausted: gh pr view работает и для issue_comment на PR.
-          # Фолбэк github.sha — только для обычного issue, где PR нет.
+          # Фолбэк github.sha — только для обычного issue, где PR нет:
+          # это head основной ветки, а не версия тикета, поэтому подпись
+          # уточняем явно.
+          sha_note=""
           if gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid > /dev/null 2>&1; then
             sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
           else
             sha="$EVENT_SHA"
+            sha_note=" (обычный issue: head основной ветки, а не версия тикета)"
           fi
           # Сегмент attempts (не attempt): форма /attempt/N даёт 404.
           logs_link="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
           if [ "$REASON" = "limit_exhausted" ]; then
             detail="Использовано попыток: ${ATTEMPTS:-?} из $BUDGET_LIMIT. Новый бюджет получит только новый PR."
+          elif [ "$REASON" = "timeout" ]; then
+            detail="Job агента остановлен по таймауту или отменён; точный исход — в логах."
           else
-            detail="Сбой запуска; если в логе таймаут — считать причину timeout, иначе infra/agent_failed."
+            detail="Сбой запуска; точная причина — в логах прогона."
           fi
           body="**Нужен человек** — запуск агента остановлен.
 
           - Причина: \`$REASON\`
           - $detail
-          - Head SHA: \`$sha\`
+          - Head SHA${sha_note}: \`$sha\`
           - Логи: $logs_link"
           gh issue comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$body"
