@@ -205,6 +205,15 @@ importers:
       '@nestjs/serve-static':
         specifier: 12.1.1
         version: 12.1.1(@nestjs/common@12.4.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.4.2)(express@5.3.0)
+      '@repo/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
+      '@repo/interval':
+        specifier: workspace:*
+        version: link:../../packages/interval
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       async-mutex:
         specifier: ^0.5.0
         version: 0.5.0
@@ -233,9 +242,6 @@ importers:
       '@types/supertest':
         specifier: 7.2.1
         version: 7.2.1
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
       supertest:
         specifier: 7.3.2
         version: 7.3.2
@@ -260,6 +266,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@repo/interval':
+        specifier: workspace:*
+        version: link:../../packages/interval
       '@repo/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -330,6 +339,15 @@ importers:
       '@typespec/openapi3':
         specifier: 1.17.0
         version: 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/openapi@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))))
+
+  packages/interval:
+    devDependencies:
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@1.8.0))(vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/sdk:
     devDependencies:

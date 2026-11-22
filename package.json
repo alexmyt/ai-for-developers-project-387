@@ -5,16 +5,17 @@
   "type": "module",
   "packageManager": "pnpm@12.18.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   },
   "scripts": {
-    "dev": "pnpm --filter @repo/contract build && pnpm -r --parallel dev",
+    "dev": "pnpm --filter @repo/contract build && pnpm build:interval && pnpm -r --parallel dev",
     "build": "pnpm -r build",
+    "build:interval": "pnpm --filter @repo/interval build",
     "generate": "pnpm --filter @repo/contract build && pnpm --filter @repo/sdk generate",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm generate && git diff --exit-code -- packages/contract/openapi.json packages/sdk/src && pnpm --filter @repo/e2e e2e",
+    "check": "pnpm format:check && pnpm lint && pnpm build && pnpm typecheck && pnpm test && pnpm generate && git diff --exit-code -- packages/contract/openapi.json packages/sdk/src && pnpm --filter @repo/e2e e2e",
     "lint": "eslint .",
-    "typecheck": "pnpm -r typecheck",
-    "test": "vitest run",
+    "typecheck": "pnpm build:interval && pnpm -r typecheck",
+    "test": "pnpm build:interval && vitest run",
     "test:watch": "vitest",
     "e2e": "pnpm build && pnpm --filter @repo/e2e e2e",
     "docker:build": "docker build -t call-calendar:latest .",

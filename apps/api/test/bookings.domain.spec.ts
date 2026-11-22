@@ -3,12 +3,9 @@
 // docs/spec/calendar.md). Время передаётся снаружи, поэтому тесты
 // детерминированы и не зависят от даты запуска.
 import { describe, expect, it } from 'vitest'
-import {
-  isFutureStart,
-  intervalsIntersect,
-  validateBookingRules,
-  type Interval,
-} from '../src/occupancy/booking.domain'
+import { isFutureStart, validateBookingRules } from '../src/occupancy/booking.domain'
+// Тип Интервала теперь живёт в пакете @repo/interval (тикет #5).
+import type { Interval } from '@repo/interval'
 
 // 12:15 по Москве 11 ноября — «сейчас» для всех проверок окна.
 const FIXED_NOW = new Date('2026-11-11T09:15:00Z')
@@ -160,67 +157,5 @@ describe('предикат границы «старт строго после n
   })
 })
 
-// Матрица пересечений из спецификации §5 и §13.1: полуоткрытые интервалы
-// [start, end), касание границами конфликтом не считается.
-describe('пересечение полуоткрытых интервалов', () => {
-  /** Настенное время по Москве в UTC-инстант: 10:00 → 07:00Z. */
-  function at(hour: number, minute: number): Date {
-    return new Date(Date.UTC(2026, 10, 12, hour - 3, minute))
-  }
-
-  it('точное наложение — конфликт', () => {
-    expect(
-      intervalsIntersect(
-        { start: at(10, 0), end: at(10, 30) },
-        { start: at(10, 0), end: at(10, 30) },
-      ),
-    ).toBe(true)
-  })
-
-  it('частичное наложение — конфликт, даже у разных типов встреч', () => {
-    // 10:00–11:00 и 10:30–11:00: пример из требований (спецификация §5).
-    expect(
-      intervalsIntersect(
-        { start: at(10, 0), end: at(11, 0) },
-        { start: at(10, 30), end: at(11, 0) },
-      ),
-    ).toBe(true)
-  })
-
-  it('вложение — конфликт', () => {
-    expect(
-      intervalsIntersect(
-        { start: at(10, 0), end: at(11, 0) },
-        { start: at(10, 10), end: at(10, 20) },
-      ),
-    ).toBe(true)
-  })
-
-  it('касание границами — не конфликт', () => {
-    // 10:00–10:30 и 10:30–11:00 совместимы (пример спецификации §5).
-    expect(
-      intervalsIntersect(
-        { start: at(10, 0), end: at(10, 30) },
-        { start: at(10, 30), end: at(11, 0) },
-      ),
-    ).toBe(false)
-  })
-
-  it('касание в другую сторону — не конфликт', () => {
-    expect(
-      intervalsIntersect(
-        { start: at(10, 30), end: at(11, 0) },
-        { start: at(10, 0), end: at(10, 30) },
-      ),
-    ).toBe(false)
-  })
-
-  it('непересекающиеся интервалы — не конфликт', () => {
-    expect(
-      intervalsIntersect(
-        { start: at(10, 0), end: at(10, 30) },
-        { start: at(11, 0), end: at(11, 30) },
-      ),
-    ).toBe(false)
-  })
-})
+// Матрица пересечений (§5, §13.1) покрыта тестами пакета @repo/interval:
+// здесь остаются только проверки через публичный шов validateBookingRules.

@@ -35,6 +35,7 @@
 | `apps/api` | NestJS 12, состояние в памяти, раздача статики |
 | `apps/web` | React 19 + Vite 8, SPA для гостя и владельца |
 | `packages/contract` | TypeSpec 1.17, из него генерируется `openapi.json` (OpenAPI 3.0) |
+| `packages/interval` | интервальная арифметика правила Конфликта: тип `Interval` и `intervalsIntersect`, полуоткрытые `[start, end)` |
 | `packages/sdk` | клиент для фронтенда, сгенерированный из `openapi.json` |
 
 - **Контракт** — TypeSpec как источник истины. `openapi.json` коммитится,
