@@ -1,0 +1,60 @@
+name: browser
+
+# Независимая браузерная проверка PR (§13 спецификации): основной и соседний
+# сценарии из точного head SHA. Секрет модели не нужен, состояние в памяти
+# API живёт только в пределах прогрона. Артефакт — свидетельство для
+# решения о мерже: человек сверяет SHA из артефакта с текущим head PR,
+# поэтому после нового push проверку повторяют.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+concurrency:
+  group: browser-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Проверяем версию автора, а не временный merge-коммит: ref указан явно.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      # Фактический SHA записывается в лог и в артефакт (e2e-sha.txt).
+      - name: Record checked-out SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "$actual" | tee e2e-sha.txt
+          echo "Ожидался head SHA PR: $EXPECTED_SHA"
+
+      # Инструменты из mise.toml — как в ci.yml и локально (AGENTS.md).
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @repo/e2e exec playwright install --with-deps chromium
+
+      # trace on — запись включена явно: артефакт нужен и для успешного
+      # прогона (по умолчанию Playwright хранит trace только для падений).
+      - run: pnpm build && pnpm --filter @repo/e2e exec playwright test --trace on
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # Имя с номером PR и head SHA: артефакт сам сообщает свою версию.
+          name: browser-e2e-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            e2e-sha.txt
+            apps/e2e/test-results/
+            apps/e2e/playwright-report/
+          retention-days: 30
+          if-no-files-found: warn
