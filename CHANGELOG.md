@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.1](https://github.com/alexmyt/ai-for-developers-project-387/compare/v0.6.0...v0.6.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* **workflow:** вернуть opencode.json к V1-совместимому формату ([c307e84](https://github.com/alexmyt/ai-for-developers-project-387/commit/c307e84cb82d3cb99b908b76a3c3a5138e4f2349)), closes [#14](https://github.com/alexmyt/ai-for-developers-project-387/issues/14)
+* **workflow:** запретить агенту /oc править файлы воркфлоу ([5714919](https://github.com/alexmyt/ai-for-developers-project-387/commit/5714919782ecc9b311af6bd588a01e109ea0e5d7))
+* **workflow:** запретить агенту /oc править файлы воркфлоу ([732c5df](https://github.com/alexmyt/ai-for-developers-project-387/commit/732c5df172663eafc5bc8053ab1606d589327f2c)), closes [#14](https://github.com/alexmyt/ai-for-developers-project-387/issues/14)
+* **workflow:** перевести правила каталогов в V1-форму permission ([75c814a](https://github.com/alexmyt/ai-for-developers-project-387/commit/75c814a9bfa06dcf8cfa97db2da7198ae3d6b9e4)), closes [#14](https://github.com/alexmyt/ai-for-developers-project-387/issues/14)
+* **workflow:** повторять запросы gh api бюджета /oc при сбоях 5xx ([3765910](https://github.com/alexmyt/ai-for-developers-project-387/commit/37659104022817b88a7c80068624149b59bde8fa))
+* **workflow:** повторять запросы gh api бюджета /oc при сбоях 5xx ([b6a7a32](https://github.com/alexmyt/ai-for-developers-project-387/commit/b6a7a32bda37f36341fce6f4a6fca6cd9e0dacd7)), closes [#14](https://github.com/alexmyt/ai-for-developers-project-387/issues/14)
+* **workflow:** сохранять отчёт аудита и создавать issue ([7fcad7b](https://github.com/alexmyt/ai-for-developers-project-387/commit/7fcad7b736ec219fae7ea2525ff3c72864d0df9b))
+* **workflow:** считать бюджет /oc по вызовам модели ([2f77528](https://github.com/alexmyt/ai-for-developers-project-387/commit/2f77528a796fd2f8cabecc0c4f04a3c16ff05296))
+* **workflow:** считать бюджет /oc по вызовам модели ([8ae491c](https://github.com/alexmyt/ai-for-developers-project-387/commit/8ae491cd9158f7d7f74258bbe702f48ac27e60c9)), closes [#14](https://github.com/alexmyt/ai-for-developers-project-387/issues/14)
+* **workflow:** убрать catch-all из edit-правил, ассертировать эффективные права ([5a8e06c](https://github.com/alexmyt/ai-for-developers-project-387/commit/5a8e06c600b473aebb08729c3e0066acfece73e0))
+
 ## [0.6.0](https://github.com/alexmyt/ai-for-developers-project-387/compare/v0.5.0...v0.6.0) (2026-11-22)
 
 
