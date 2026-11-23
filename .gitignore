@@ -11,5 +11,6 @@ playwright-report/
 .vscode/
 .idea/
 # Lighthouse-отчёты аудита (.github/workflows/opencode-audit.yml) — только
-# артефакт прогона, в коммиты не попадают.
-.lighthouse-reports/
+# артефакт прогона, в коммиты не попадают. Каталог не скрытый: upload-artifact
+# по умолчанию пропускает пути, начинающиеся с точки.
+lighthouse-reports/
