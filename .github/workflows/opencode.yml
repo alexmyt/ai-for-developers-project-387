@@ -169,7 +169,7 @@ jobs:
           # Сегмент attempts (не attempt): форма /attempt/N даёт 404.
           logs_link="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
           if [ "$REASON" = "limit_exhausted" ]; then
-            detail="Использовано попыток: ${ATTEMPTS:-?} из $BUDGET_LIMIT. Новый бюджет получит только новый PR."
+            detail="Использовано попыток: ${ATTEMPTS:-?} из $BUDGET_LIMIT. Новый бюджет получит только новый issue или PR."
           elif [ "$REASON" = "timeout" ]; then
             detail="Job агента остановлен по таймауту или отменён; точный исход — в логах."
           else
