@@ -25,6 +25,55 @@ jobs:
       # в CI та же команда, что и локально — mise run check (см. AGENTS.md).
       - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5
 
+      # opencode.json читают два CLI: V1 1.19.6 ставит экшен /oc
+      # (opencode.yml, opencode-triage.yml), V2 2.3.0 из mise — ревью PR
+      # и локальные сессии. V2-only ключ из 4bd3bb5 прошёл все проверки,
+      # но сломал /oc после мержа (прогон 45017653171); страж ловит
+      # нечитаемый конфиг до слияния, а не первой попыткой бюджета.
+      - name: Validate opencode.json with both agent CLIs
+        run: |
+          set -euo pipefail
+          npx -y opencode-ai@1.19.6 models > /dev/null
+          opencode models > /dev/null
+          # Эффективные правила, а не только парсинг: build должен видеть
+          # deny на workflow-файл, plan и explore — сохранить read-only
+          # (регрессия catch-all: находка 1 ревью PR #18).
+          cat > "$RUNNER_TEMP/assert_agents.py" <<'PY'
+          import json, re, sys
+          agents = json.load(sys.stdin)
+          by_id = {a["id"]: a.get("permissions", []) for a in agents}
+
+          def matches(rule_action, rule_resource, action, resource):
+              for pat_raw, value in ((rule_action, action), (rule_resource, resource)):
+                  pat = re.escape(pat_raw).replace(r"\*", ".*").replace(r"\?", ".")
+                  if not re.fullmatch(pat, value):
+                      return False
+              return True
+
+          def last_effect(rules, action, resource):
+              effect = None
+              for r in rules:
+                  if matches(r.get("action", "*"), r.get("resource", "*"), action, resource):
+                      effect = r.get("effect")
+              return effect
+
+          wf = ".github/workflows/demo.yml"
+          assert last_effect(by_id["build"], "edit", wf) == "deny", "build: workflow-файл редактируем"
+          for ro in ("plan", "explore"):
+              assert last_effect(by_id[ro], "edit", "README.md") == "deny", ro + ": потерян read-only"
+          print("правила агентов: ok")
+          PY
+          cat > "$RUNNER_TEMP/assert_v1_config.py" <<'PY'
+          import json, sys
+          d = json.load(sys.stdin)
+          edit = (d.get("permission") or {}).get("edit") or {}
+          assert edit.get(".github/workflows/*") == "deny", "V1: нет deny .github/workflows/*"
+          assert edit.get("*/.github/workflows/*") == "deny", "V1: нет deny абсолютного пути"
+          print("V1 permission.edit: ok")
+          PY
+          opencode debug agents | python3 "$RUNNER_TEMP/assert_agents.py"
+          npx -y opencode-ai@1.19.6 debug config | python3 "$RUNNER_TEMP/assert_v1_config.py"
+
       - run: pnpm install --frozen-lockfile
 
       # Браузер для Playwright: mise run check завершается браузерным e2e
