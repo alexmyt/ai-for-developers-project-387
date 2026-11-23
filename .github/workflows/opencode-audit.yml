@@ -1,0 +1,150 @@
+name: OpenCode Page Audit
+
+# Регулярный аудит скорости главной страницы приложения: Lighthouse собирает
+# отчёт, агент OpenCode разбирает его и по новой находке создаёт issue.
+# Расписание и ручной запуск (workflow_dispatch) ведут к одному и тому же
+# сценарию; ручной прогон проверяет его без ожидания ночи. У запуска по
+# расписанию нет пользовательского комментария, поэтому инструкция агенту
+# передаётся в prompt. Решение о реализации находки принимает человек:
+# агент только создаёт issue-обращение, код и PR он не трогает.
+on:
+  schedule:
+    # Ежедневно в 06:17 по Москве; таймзона указана явно рядом с cron
+    # (по умолчанию GitHub Actions считает время в UTC).
+    - cron: '17 6 * * *'
+      timezone: Europe/Moscow
+  workflow_dispatch:
+    inputs:
+      training_report:
+        description: 'Учебный отчёт (Markdown) для демонстрации создания issue; live-аудит не выполняется'
+        required: false
+        default: ''
+
+# Пустой набор на уровне воркфлоу: права выданы точечно на уровне job.
+permissions: {}
+# Аудит — не чаще одного запуска в сутки; параллельные запуски (расписание
+# и ручной) выстраиваются в очередь, незавершённый прогон не отменяется.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Авторизация через GITHUB_TOKEN: агент создаёт issue через gh CLI,
+    # поэтому job'у нужен issues: write. Прав на код и PR нет — сценарий
+    # их не делает; checkout без persist-credentials тоже исключает push.
+    permissions:
+      contents: read
+      issues: write
+    env:
+      APP_URL: ${{ vars.APP_URL }}
+      TRAINING_REPORT: ${{ inputs.training_report }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      # opencode из mise.toml: чексумма в mise.lock вместо curl|bash
+      # (правила unpinned-uses и unverified-download jactionlint).
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5
+
+      - name: Check APP_URL variable
+        run: |
+          set -euo pipefail
+          if [ -z "$APP_URL" ]; then
+            echo "::error::Переменная репозитория APP_URL не задана (Settings → Secrets and variables → Actions → Variables)"
+            exit 1
+          fi
+          echo "Аудируемая страница: $APP_URL"
+
+      # Free-инстанс Render засыпает без трафика, первый запрос будит его
+      # до минуты. Без прогрева Lighthouse замерил бы холодный старт.
+      - name: Wake up app and check availability
+        id: probe
+        if: inputs.training_report == ''
+        run: |
+          set -euo pipefail
+          mkdir -p .lighthouse-reports
+          available=no
+          for _ in $(seq 1 8); do
+            if curl -fsS --max-time 20 "$APP_URL/api/health" > .lighthouse-reports/health.json; then
+              available=yes
+              break
+            fi
+            sleep 10
+          done
+          echo "available=$available" >> "$GITHUB_OUTPUT"
+          echo "Доступность $APP_URL: $available"
+
+      - name: Save training report
+        if: inputs.training_report != ''
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$TRAINING_REPORT" > .lighthouse-reports/training-report.md
+
+      - name: Collect Lighthouse report
+        if: steps.probe.outputs.available == 'yes' && inputs.training_report == ''
+        run: |
+          set -euo pipefail
+          npx --yes lighthouse@12 "$APP_URL" \
+            --output json --output html \
+            --output-path .lighthouse-reports/lighthouse-report \
+            --only-categories=performance,accessibility,best-practices,seo \
+            --chrome-flags="--headless=new --no-sandbox" \
+            --quiet
+          # Компактный дайджест для агента: оценки категорий и проваленные
+          # аудиты с числами; полный JSON остаётся рядом для деталей.
+          jq '{finalUrl, fetchTime, categories: .categories | map_values(.score), findings: [.audits | to_entries[] | select(.value.score != null and .value.score < 0.9) | {id: .key, title: .value.title, score: .value.score, displayValue: .value.displayValue}]}' \
+            .lighthouse-reports/lighthouse-report.report.json \
+            > .lighthouse-reports/summary.json
+          ls -la .lighthouse-reports/
+
+      - name: Upload reports artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lighthouse-audit-${{ github.run_id }}
+          path: .lighthouse-reports/
+          retention-days: 30
+          if-no-files-found: warn
+
+      # Агент работает в игнорируемом каталоге .lighthouse-reports/
+      # (.gitignore) — отчёты не попадают в коммиты. Вывод агента — текст
+      # из jsonl, его публикует следующий шаг в job summary.
+      - name: Analyze report with OpenCode
+        if: always()
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OPENCODE_PERMISSION: '{"edit":"deny","bash":{"*":"deny","gh issue list *":"allow","gh issue view *":"allow","gh issue create *":"allow","gh run view *":"allow","ls *":"allow","cat *":"allow"}}'
+        run: |
+          set -euo pipefail
+          timeout -k 10s 600s opencode run --print-logs --log-level info --model opencode/deepseek-v4.1-flash --agent plan --format json \
+            "Analyze the page-speed audit in repository $GITHUB_REPOSITORY. First read AGENTS.md and docs/agents/issue-tracker.md at the repository root. Audit artifacts are in .lighthouse-reports/ inside the repository working directory; reads outside it are denied. Start with summary.json (the digest) and read lighthouse-report.report.json for details.
+            Choose the case:
+            - If .lighthouse-reports/training-report.md exists, it is an explicitly marked TRAINING report used to demonstrate issue creation. Analyze it as described below, but the issue title must start with the [учебный] prefix and the body must say this is a training finding, not a confirmed defect of the application. Do not collect a live audit yourself.
+            - Else if lighthouse-report.report.json exists, it is a real audit of $APP_URL collected by this run.
+            - Else: the application was unavailable and there are no data. Do not create any issue and do not guess: state explicitly that the audit produced no data, which neither confirms nor refutes any defect, and finish.
+            For a real or training report: find at most one most important concrete finding (for example a specific failed audit or a low category score with its numbers; skip advisories without measurable impact). Before creating anything, search existing issues in this repository with gh issue list and gh issue view and compare the substance, not the wording: if an issue about the same problem already exists and you have no new information, do not create a duplicate issue and do not post a duplicate comment — report that the finding is already tracked. Create a new issue only for a genuinely new finding, exactly one, with gh issue create. The issue body must be in Russian and must contain: the problem with concrete numbers, the proposed action, the audited app URL $APP_URL, and the link to this workflow run $RUN_URL.
+            Finish with a Markdown answer in Russian: data availability, findings or their absence, the created or already tracked issue number, and the run link $RUN_URL. Do not modify files, do not create branches or pull requests." \
+            < /dev/null | tee "$RUNNER_TEMP/opencode-audit.jsonl"
+
+      - name: Publish agent summary
+        if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          jq -sr 'map(select(.type == "text") | .part.text) | last // empty' \
+            "$RUNNER_TEMP/opencode-audit.jsonl" > "$RUNNER_TEMP/opencode-audit.md"
+          test -s "$RUNNER_TEMP/opencode-audit.md"
+          {
+            echo "## Аудит страницы"
+            echo "Прогон: $RUN_URL"
+            echo
+            cat "$RUNNER_TEMP/opencode-audit.md"
+          } >> "$GITHUB_STEP_SUMMARY"

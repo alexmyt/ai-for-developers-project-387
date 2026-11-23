@@ -10,3 +10,6 @@ playwright-report/
 .DS_Store
 .vscode/
 .idea/
+# Lighthouse-отчёты аудита (.github/workflows/opencode-audit.yml) — только
+# артефакт прогона, в коммиты не попадают.
+.lighthouse-reports/
